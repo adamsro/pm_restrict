@@ -1,0 +1,9 @@
+name = Privatemsg Restrict Role
+description = Restrict possible recipients to a subset fo a certain role.
+package = Mail
+core = 7.x
+dependencies[] = privatemsg
+files[]=pm_restrict_role.module
+files[]=pm_restrict_role.pages.inc
+files[]=pm_restrict_role.test
+configure=admin/config/messaging/privatemsg/restrict
