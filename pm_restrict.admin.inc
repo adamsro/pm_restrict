@@ -21,7 +21,7 @@
  * @return
  *   Part of a form with controls for sending, receiving and actions.
  */
-function _pm_restrict_actions_form($details, $blacklist = TRUE) {
+function _pm_restrict_actions_form($details) {
   $form = array(
     '#tree' => TRUE,
   );
@@ -45,22 +45,14 @@ function _pm_restrict_actions_form($details, $blacklist = TRUE) {
     '#disabled' => $row_disabled,
   );
 
-  // Provide different action radios if we're using a whitelist or a blacklist.
-  if ($blacklist) {
-    $options = array(
-      PM_BLOCK_USER_DISALLOW_BLOCKING => t('Disallow blocking author'),
-      PM_BLOCK_USER_DISALLOW_SENDING => t('Disallow sending message'),
-    );
-    $default_value = (isset($details['action']) ? $details['action'] : PM_BLOCK_USER_DISALLOW_BLOCKING);
-  }
-  else {
-    // TODO: add whitelist options/default_value here.
-  }
   $form['action']  = array(
     '#type' => 'radios',
-    '#options' => $options,
+    '#options' => array(
+      PM_RESTRICT_ALL_RECIPIENTS => t('Send to all recipients'),
+      PM_RESTRICT_MULTIPLE_SELECTIONS => t('Allow selection of recipients'),
+    ),
     '#disabled' => $row_disabled,
-    '#default_value' => $default_value,
+    '#default_value' => (isset($details['action']) ? $details['action'] : PM_RESTRICT_ALL_RECIPIENTS),
   );
 
   $form['enabled'] = array(

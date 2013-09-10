@@ -6,12 +6,12 @@
  */
 
 /**
- * Disallow blocking private messages from a user.
+ * Allow a user to choose which recipients to send to within the restricted subset.
  */
 define('PM_RESTRICT_MULTIPLE_SELECTIONS', 0);
 
 /**
- * Disallow sending private messages to a user.
+ *  Force a user to send to all recip he/she has been restriced to.
  */
 define('PM_RESTRICT_ALL_RECIPIENTS', 1);
 
@@ -30,13 +30,20 @@ function pm_restrict_help($path) {
  */
 function pm_restrict_menu() {
   $items['admin/config/messaging/privatemsg/restrict'] = array(
-    'title'            => 'User blocking rules',
+    'title'            => 'User restriction rules',
     'description'      => 'Configure rules for which users/groups/roles are restricted to sending to which users/groups/roles.',
     'page callback'    => 'drupal_get_form',
     'page arguments'   => array('pm_restrict_settings'),
     'file'             => 'pm_restrict.admin.inc',
     'access arguments' => array('administer privatemsg settings'),
     'type'             => MENU_LOCAL_TASK,
+  );
+  $items['messages/restrict/js'] = array(
+    'title'            => 'Javascript block actions form',
+    'page callback'    => 'pm_restrict_js',
+    'file'             => 'pm_restrict.admin.inc',
+    'access arguments' => array('administer privatemsg settings'),
+    'type'             => MENU_CALLBACK,
   );
   return $items;
 }
@@ -52,61 +59,6 @@ function pm_restrict_theme() {
     ),
   );
 }
-
-/**
- * Theme the user actions form.
- *
- * @ingroup theming
- */
-function theme_pm_restrict_actions($form) {
-  $rows = array();
-  $headers = array(
-    t('author'),
-    t('may only send to'),
-    t('if multiple recipients exist:'),
-    t('Enabled'),
-    '',
-  );
-  $form_data = element_children($form['form']);
-
-  foreach ($form_data as $key) {
-    // Build the table row.
-    $row = array(
-      'data' => array(
-        array('data' => drupal_render($form['form'][$key]['author'])),
-        array('data' => drupal_render($form['form'][$key]['recipient'])),
-        array('data' => drupal_render($form['form'][$key]['action'])),
-        array('data' => drupal_render($form['form'][$key]['enabled'])),
-        array('data' => drupal_render($form['form'][$key]['remove'])),
-      ),
-    );
-
-    // Add additional attributes to the row, such as a class for this row.
-    if (isset($form['form'][$key]['#attributes'])) {
-      $row = array_merge($row, $form['form'][$key]['#attributes']);
-    }
-    $rows[] = $row;
-  }
-
-  // If there are no rows, output some instructions for the user.
-  if (empty($form_data)) {
-    $rows[] = array(
-      array(
-        'data' => t("No rules have been added. All users may send messages to other users on the system without restriction. To restrict the possible recipients fr a certain role, click 'Add new rule'."),
-        'colspan' => '5',
-      ),
-    );
-  }
-
-  $output = theme('table', array(
-    'header' => $headers,
-    'rows' => $rows
-  ));
-  $output .= drupal_render_children($form['form']);
-
-  return $output;
-}
-
 /**
  * Checks whether a rule exists for a given author, recipient and action.
  *
@@ -125,7 +77,7 @@ function theme_pm_restrict_actions($form) {
  * @return
  *   TRUE if a rule exists for the combination of author recipient and action.
  */
-function _pm_restrict_rule_exists($author, $recipient, $action = PM_BLOCK_USER_DISALLOW_BLOCKING) {
+function _pm_restrict_rule_exists($author, $recipient) {
   $block_actions = variable_get('pm_restrict_actions', array());
   foreach ($block_actions as $details) {
     // If this rule doesn't relate to $action, or it's disabled
@@ -148,15 +100,27 @@ function _pm_restrict_rule_exists($author, $recipient, $action = PM_BLOCK_USER_D
 }
 
 /**
+ * Implements hook_privatemsg_namelookup_matches.
+ */
+function pm_resrict_privatemsg_name_lookup_matches_alter(&$matches, $string) {
+  $block_actions = variable_get('pm_restrict_actions', array());
+  exit(var_dump($block_actions));
+  foreach ($block_actions as $details) {
+  }
+}
+
+/**
  * Implements hook_privatemsg_block_message.
  */
-// function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
-// }
+function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
+  $blocked = array();
+  return $blocked;
+}
 
 /**
  * Implements hook_query_TAG_alter().
  *
  * Remove blocked users.
  */
-// function pm_restrict_query_privatemsg_autocomplete_alter($query) {
-// }
+ function pm_restrict_query_privatemsg_autocomplete_alter($query) {
+ }
