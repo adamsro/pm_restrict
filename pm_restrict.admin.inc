@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Administration menu callbacks for pm_restrict_role.module.
+ * Administration menu callbacks for pm_restrict.module.
  */
 
 /**
@@ -21,7 +21,7 @@
  * @return
  *   Part of a form with controls for sending, receiving and actions.
  */
-function _pm_restrict_role_actions_form($details, $blacklist = TRUE) {
+function _pm_restrict_actions_form($details, $blacklist = TRUE) {
   $form = array(
     '#tree' => TRUE,
   );
@@ -31,15 +31,17 @@ function _pm_restrict_role_actions_form($details, $blacklist = TRUE) {
   $row_disabled = (isset($details['enabled']) ? !$details['enabled'] : FALSE);
 
   $form['author'] = array(
-    '#type' => 'select',
-    '#options' => user_roles(TRUE),
-    '#default_value' => (isset($details['author']) ? $details['author'] : DRUPAL_AUTHENTICATED_RID),
+    '#type' => 'textfield',
+    // '#title' => t('u'),
+    '#autocomplete_path' => 'messages/autocomplete',
+    '#default_value' => (isset($details['author']) ? $details['author'] : ''),
     '#disabled' => $row_disabled,
   );
   $form['recipient'] = array(
-    '#type' => 'select',
-    '#options' => user_roles(TRUE),
-    '#default_value' => (isset($details['recipient']) ? $details['recipient'] : DRUPAL_AUTHENTICATED_RID),
+    '#type' => 'textfield',
+    // '#title' => t('u'),
+    '#autocomplete_path' => 'messages/autocomplete',
+    '#default_value' => (isset($details['recipient']) ? $details['recipient'] : ''),
     '#disabled' => $row_disabled,
   );
 
@@ -67,13 +69,13 @@ function _pm_restrict_role_actions_form($details, $blacklist = TRUE) {
   );
   $form['remove'] = array(
     '#type' => 'submit',
-    '#submit' => array('pm_restrict_role_remove_submit'),
+    '#submit' => array('pm_restrict_remove_submit'),
     '#value' => t('Remove_' . $delta),
     '#attributes' => array('class' => array('remove-action')),
     '#prefix' => '<div id="remove-rule-button">',
     '#suffix' => '<label for="edit-remove">' . t('Remove rule') . '</label></div>',
     '#ajax' => array(
-      'callback' => 'pm_restrict_role_js',
+      'callback' => 'pm_restrict_js',
       'wrapper' => 'block-actions',
     ),
   );
@@ -91,9 +93,9 @@ function _pm_restrict_role_actions_form($details, $blacklist = TRUE) {
  * @return
  *   Array of settings, ready to be stored in the database.
  *
- * @see pm_restrict_role_settings_submit()
+ * @see pm_restrict_settings_submit()
  */
-function _pm_restrict_role_settings_filter($settings) {
+function _pm_restrict_settings_filter($settings) {
   // Add-in the names of any settings to be saved into the array below.
   $save_keys = array('author', 'recipient', 'action', 'enabled');
   $matching = array();
@@ -109,23 +111,23 @@ function _pm_restrict_role_settings_filter($settings) {
     return $matching;
   }
   else {
-    return array_map('_pm_restrict_role_settings_filter', $settings);
+    return array_map('_pm_restrict_settings_filter', $settings);
   }
 }
 
 /**
  * Menu callback for AHAH handling.
  */
-function pm_restrict_role_js($form, $form_state) {
+function pm_restrict_js($form, $form_state) {
   return drupal_render($form['block_actions']);
 }
 
 /**
  * Submit handler for 'More' button, adds a new action.
  *
- * @see pm_restrict_role_remove_submit()
+ * @see pm_restrict_remove_submit()
  */
-function pm_restrict_role_more_submit($form, &$form_state) {
+function pm_restrict_more_submit($form, &$form_state) {
   unset($form_state['submit_handlers']);
   form_execute_handlers('submit', $form, $form_state);
   // Get the submitted actions, then put them into a special area of
@@ -133,38 +135,38 @@ function pm_restrict_role_more_submit($form, &$form_state) {
   $submitted_values = $form_state['values'];
   // Add an empty action.
   $submitted_values['block_actions'][] = array();
-  $form_state['pm_restrict_role'] = $submitted_values;
+  $form_state['pm_restrict'] = $submitted_values;
   // Rebuild the form by passing our $form_state through the
-  // pm_restrict_role_settings() builder function.
+  // pm_restrict_settings() builder function.
   $form_state['rebuild'] = TRUE;
 }
 
 /**
  * Submit handler for 'Remove' button, removes an action.
  *
- * @see pm_restrict_role_more_submit()
+ * @see pm_restrict_more_submit()
  */
-function pm_restrict_role_remove_submit($form, &$form_state) {
+function pm_restrict_remove_submit($form, &$form_state) {
   unset($form_state['submit_handlers']);
   form_execute_handlers('submit', $form, $form_state);
   $submitted_values = $form_state['values'];
   // Remove the requested action.
   $delta = $form_state['clicked_button']['#parents'][1];
   unset($submitted_values['block_actions'][$delta]);
-  $form_state['pm_restrict_role'] = $submitted_values;
+  $form_state['pm_restrict'] = $submitted_values;
   $form_state['rebuild'] = TRUE;
 }
 
 /**
  * Menu callback for blocked user settings.
  */
-function pm_restrict_role_settings($form, &$form_state) {
+function pm_restrict_settings($form, &$form_state) {
   // Need to cache form for AHAH, so it can be rebuilt from cache later.
   $form = array(
     '#cache' => TRUE,
     '#attached' => array(
       'css' => array(
-        drupal_get_path('module', 'pm_restrict_role') . '/pm_restrict_role.css',
+        drupal_get_path('module', 'pm_restrict') . '/pm_restrict.css',
       ),
     ),
   );
@@ -174,21 +176,21 @@ function pm_restrict_role_settings($form, &$form_state) {
     '#tree' => TRUE,
     '#prefix' => '<div id="block-actions">',
     '#suffix' => '</div>',
-    '#theme' => 'pm_restrict_role_actions',
+    '#theme' => 'pm_restrict_actions',
   );
 
   // Should we populate the form with data from $form_state or the database?
-  if (!isset($form_state['pm_restrict_role']['block_actions'])) {
-    $block_actions = variable_get('pm_restrict_role_actions', array());
+  if (!isset($form_state['pm_restrict']['block_actions'])) {
+    $block_actions = variable_get('pm_restrict_actions', array());
   }
   else {
-    $block_actions = $form_state['pm_restrict_role']['block_actions'];
+    $block_actions = $form_state['pm_restrict']['block_actions'];
   }
   // Work through each rule, adding it as a new element in
   // $form['block_actions'] ready to be themed later.
   foreach ($block_actions as $delta => $details) {
     $details['delta'] = $delta;
-    $form['block_actions'][$delta] = _pm_restrict_role_actions_form($details);
+    $form['block_actions'][$delta] = _pm_restrict_actions_form($details);
   }
 
   // The magic AHAH callback button that adds more rows.
@@ -198,9 +200,9 @@ function pm_restrict_role_settings($form, &$form_state) {
     '#weight' => 1,
     '#prefix' => '<div id="add-rule-button">',
     '#suffix' => '<label for="edit-pm-block-actions-more">' . t('Add new rule') . '</label></div>',
-    '#submit' => array('pm_restrict_role_more_submit'),
+    '#submit' => array('pm_restrict_more_submit'),
     '#ajax' => array(
-      'callback' => 'pm_restrict_role_js',
+      'callback' => 'pm_restrict_js',
       'wrapper' => 'block-actions',
       'method' => 'replace',
       'effect' => 'fade',
@@ -219,17 +221,17 @@ function pm_restrict_role_settings($form, &$form_state) {
 /**
  * Submit handler for admin form.
  */
-function pm_restrict_role_settings_submit($form, &$form_state) {
+function pm_restrict_settings_submit($form, &$form_state) {
   // We don't want it to submit when we're adding/removing actions.
   if ($form_state['clicked_button']['#id'] == 'edit-submit-form') {
     // If the form's 'block_actions' aren't set, the user has deleted all the
     // rows in the table, so we save an empty array to stop errors in the form
     // builder.
     if (isset($form_state['values']['block_actions'])) {
-      variable_set('pm_restrict_role_actions', _pm_restrict_role_settings_filter($form_state['values']['block_actions']));
+      variable_set('pm_restrict_actions', _pm_restrict_settings_filter($form_state['values']['block_actions']));
     }
     else {
-      variable_set('pm_restrict_role_actions', array());
+      variable_set('pm_restrict_actions', array());
     }
     drupal_set_message(t('The configuration options have been saved.'));
   }

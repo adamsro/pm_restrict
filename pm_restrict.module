@@ -1,0 +1,162 @@
+<?php
+
+/**
+ * @file
+ * Allows sending restrictions on users/roles/groups
+ */
+
+/**
+ * Disallow blocking private messages from a user.
+ */
+define('PM_RESTRICT_MULTIPLE_SELECTIONS', 0);
+
+/**
+ * Disallow sending private messages to a user.
+ */
+define('PM_RESTRICT_ALL_RECIPIENTS', 1);
+
+/**
+ * Implements hook_help().
+ */
+function pm_restrict_help($path) {
+  switch ($path) {
+    case 'admin/settings/messages/':
+      return '<p>' . t('This area is used to define user blocking rules for the Privatemsg module. Rules allow control of who may block messages from whom. By default all users are allowed to block messages from anyone else. However, a site may have groups of users that need to contact or get information to others, for example: the site may have administrative staff or be a forum with moderators. Groups of users are defined by roles, which can be managed on the <a href="@roles">roles configuration page</a>.', array('@roles' => url('admin/user/roles'))) . '</p>';
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function pm_restrict_menu() {
+  $items['admin/config/messaging/privatemsg/restrict'] = array(
+    'title'            => 'User blocking rules',
+    'description'      => 'Configure rules for which users/groups/roles are restricted to sending to which users/groups/roles.',
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('pm_restrict_settings'),
+    'file'             => 'pm_restrict.admin.inc',
+    'access arguments' => array('administer privatemsg settings'),
+    'type'             => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function pm_restrict_theme() {
+  return array(
+    'pm_restrict_actions' => array(
+      'render element' => 'form',
+      'file'      => 'pm_restrict.admin.inc',
+    ),
+  );
+}
+
+/**
+ * Theme the user actions form.
+ *
+ * @ingroup theming
+ */
+function theme_pm_restrict_actions($form) {
+  $rows = array();
+  $headers = array(
+    t('author'),
+    t('may only send to'),
+    t('if multiple recipients exist:'),
+    t('Enabled'),
+    '',
+  );
+  $form_data = element_children($form['form']);
+
+  foreach ($form_data as $key) {
+    // Build the table row.
+    $row = array(
+      'data' => array(
+        array('data' => drupal_render($form['form'][$key]['author'])),
+        array('data' => drupal_render($form['form'][$key]['recipient'])),
+        array('data' => drupal_render($form['form'][$key]['action'])),
+        array('data' => drupal_render($form['form'][$key]['enabled'])),
+        array('data' => drupal_render($form['form'][$key]['remove'])),
+      ),
+    );
+
+    // Add additional attributes to the row, such as a class for this row.
+    if (isset($form['form'][$key]['#attributes'])) {
+      $row = array_merge($row, $form['form'][$key]['#attributes']);
+    }
+    $rows[] = $row;
+  }
+
+  // If there are no rows, output some instructions for the user.
+  if (empty($form_data)) {
+    $rows[] = array(
+      array(
+        'data' => t("No rules have been added. All users may send messages to other users on the system without restriction. To restrict the possible recipients fr a certain role, click 'Add new rule'."),
+        'colspan' => '5',
+      ),
+    );
+  }
+
+  $output = theme('table', array(
+    'header' => $headers,
+    'rows' => $rows
+  ));
+  $output .= drupal_render_children($form['form']);
+
+  return $output;
+}
+
+/**
+ * Checks whether a rule exists for a given author, recipient and action.
+ *
+ * For example: if this is passed User A (who has the admin role), User B (who
+ * has the authenticated user role) and PM_BLOCK_USER_DISALLOW_BLOCKING
+ * parameters, and a rule is configured that disallows authenticated users
+ * blocking admins then this function will return TRUE.
+ *
+ * @param $author
+ *   Author user object to check.
+ * @param $recipient
+ *   Receiver user object to check.
+ * @param $action
+ *   The action to be taken, defaults to PM_BLOCK_USER_DISALLOW_BLOCKING.
+ *
+ * @return
+ *   TRUE if a rule exists for the combination of author recipient and action.
+ */
+function _pm_restrict_rule_exists($author, $recipient, $action = PM_BLOCK_USER_DISALLOW_BLOCKING) {
+  $block_actions = variable_get('pm_restrict_actions', array());
+  foreach ($block_actions as $details) {
+    // If this rule doesn't relate to $action, or it's disabled
+    // ignore it and go to next loop iteration.
+    if ($details['action'] != $action || !$details['enabled']) {
+      continue;
+    }
+    // There are no rules governing user one, but user one may have roles that
+    // affect other users, so these exceptions are narrow in scope.
+    // Disallow sending affects private message authors.
+    if ($author->uid == 1) {
+      continue;
+    }
+    // The author has a role matching the rule and so does the recipient.
+    if (isset($author->roles[$details['author']]) && isset($recipient->roles[$details['recipient']])) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_privatemsg_block_message.
+ */
+// function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
+// }
+
+/**
+ * Implements hook_query_TAG_alter().
+ *
+ * Remove blocked users.
+ */
+// function pm_restrict_query_privatemsg_autocomplete_alter($query) {
+// }
