@@ -59,6 +59,61 @@ function pm_restrict_theme() {
     ),
   );
 }
+
+/**
+ * Theme the user actions form.
+ *
+ * @ingroup theming
+ */
+function theme_pm_restrict_actions($form) {
+  $rows = array();
+  $headers = array(
+    t('author'),
+    t('may only send to'),
+    t('if multiple recipients exist:'),
+    t('Enabled'),
+    '',
+  );
+  $form_data = element_children($form['form']);
+
+  foreach ($form_data as $key) {
+    // Build the table row.
+    $row = array(
+      'data' => array(
+        array('data' => drupal_render($form['form'][$key]['author'])),
+        array('data' => drupal_render($form['form'][$key]['recipient'])),
+        array('data' => drupal_render($form['form'][$key]['action'])),
+        array('data' => drupal_render($form['form'][$key]['enabled'])),
+        array('data' => drupal_render($form['form'][$key]['remove'])),
+      ),
+    );
+
+    // Add additional attributes to the row, such as a class for this row.
+    if (isset($form['form'][$key]['#attributes'])) {
+      $row = array_merge($row, $form['form'][$key]['#attributes']);
+    }
+    $rows[] = $row;
+  }
+
+  // If there are no rows, output some instructions for the user.
+  if (empty($form_data)) {
+    $rows[] = array(
+      array(
+        'data' => t("No rules have been added. All users may send messages to other users on the system without restriction. To restrict the possible recipients fr a certain role, click 'Add new rule'."),
+        'colspan' => '5',
+      ),
+    );
+  }
+
+  $output = theme('table', array(
+    'header' => $headers,
+    'rows' => $rows
+  ));
+  $output .= drupal_render_children($form['form']);
+
+  return $output;
+}
+
 /**
  * Checks whether a rule exists for a given author, recipient and action.
  *
