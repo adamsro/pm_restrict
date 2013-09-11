@@ -114,61 +114,45 @@ function theme_pm_restrict_actions($form) {
   return $output;
 }
 
-/**
- * Checks whether a rule exists for a given author, recipient and action.
- *
- * For example: if this is passed User A (who has the admin role), User B (who
- * has the authenticated user role) and PM_BLOCK_USER_DISALLOW_BLOCKING
- * parameters, and a rule is configured that disallows authenticated users
- * blocking admins then this function will return TRUE.
- *
- * @param $author
- *   Author user object to check.
- * @param $recipient
- *   Receiver user object to check.
- * @param $action
- *   The action to be taken, defaults to PM_BLOCK_USER_DISALLOW_BLOCKING.
- *
- * @return
- *   TRUE if a rule exists for the combination of author recipient and action.
- */
-function _pm_restrict_rule_exists($author, $recipient) {
-  $block_actions = variable_get('pm_restrict_actions', array());
-  foreach ($block_actions as $details) {
-    // If this rule doesn't relate to $action, or it's disabled
-    // ignore it and go to next loop iteration.
-    if ($details['action'] != $action || !$details['enabled']) {
-      continue;
-    }
-    // There are no rules governing user one, but user one may have roles that
-    // affect other users, so these exceptions are narrow in scope.
-    // Disallow sending affects private message authors.
-    if ($author->uid == 1) {
-      continue;
-    }
-    // The author has a role matching the rule and so does the recipient.
-    if (isset($author->roles[$details['author']]) && isset($recipient->roles[$details['recipient']])) {
+
+function _pm_restrict_is_subset_of($user, $set) {
+ // $author->roles[$details['author']]
+  foreach ($set[0] as $object) {
+    if ($object->type == 'user' && $user->uid == $object->uid) {
       return TRUE;
     }
+    elseif ($object->type == 'role' && isset($user->roles[$object->name])) {
+      return TRUE;
+    }
+    elseif ($object->type == 'group') {
+      // TODO check if user belongs in group
+      return TRUE;
+    }
+
   }
   return FALSE;
 }
 
 /**
- * Implements hook_privatemsg_namelookup_matches.
- */
-function pm_resrict_privatemsg_name_lookup_matches_alter(&$matches, $string) {
-  $block_actions = variable_get('pm_restrict_actions', array());
-  exit(var_dump($block_actions));
-  foreach ($block_actions as $details) {
-  }
-}
-
-/**
- * Implements hook_privatemsg_block_message.
+ * Implements hook_privatemsg_block_message().
  */
 function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
   $blocked = array();
+  $restrict_actions = variable_get('pm_restrict_actions', array());
+  foreach ($restrict_actions as $action) {
+    $action_authors = _privatemsg_parse_userstring($action['author']);
+    if (_pm_restrict_is_subset_of($author, $action_authors)) {
+      $action_recipients = _privatemsg_parse_userstring($action['recipient']);
+      foreach ($recipients as $recipient_id => $recipient) {
+        if (_pm_restrict_is_subset_of($recipient, $action_recipients)) {
+          $blocked[$recipient_id] = array(
+            'recipient' => $recipient_id,
+            'message' => t('Not allowed to write messages to *recipient'),
+            );
+        }
+      }
+    }
+  }
   return $blocked;
 }
 
