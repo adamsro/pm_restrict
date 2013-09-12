@@ -114,21 +114,31 @@ function theme_pm_restrict_actions($form) {
   return $output;
 }
 
-
-function _pm_restrict_is_subset_of($user, $set) {
- // $author->roles[$details['author']]
-  foreach ($set[0] as $object) {
-    if ($object->type == 'user' && $user->uid == $object->uid) {
+/**
+ * Determine if a user is a part of a role or group
+ *  using 'load_recipients' would be more portable but less efficient
+ *
+ * @param  $user
+ *  Drupal account object
+ * @param  $set
+ *   array result of _privatemsg_parse_userstring
+ * @return
+ *   TRUE if user is a member of the given set.
+ */
+function _pm_restrict_is_subset_of($account, $set) {
+  foreach ($set as $object) {
+    if ($object->type == 'user' && $account->uid == $object->uid) {
       return TRUE;
     }
-    elseif ($object->type == 'role' && isset($user->roles[$object->name])) {
+    elseif ($object->type == 'role' && isset($account->roles[$object->rid])) {
       return TRUE;
     }
-    elseif ($object->type == 'group') {
-      // TODO check if user belongs in group
-      return TRUE;
+    elseif (strpos($object->type, 'og:') !== FALSE) {
+      if (function_exists('og_is_member')
+        && og_is_member(str_replace('og:', '', $object->type), $object->vid, 'user', $account) == TRUE) {
+        return TRUE;
+      }
     }
-
   }
   return FALSE;
 }
@@ -140,15 +150,21 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
   $blocked = array();
   $restrict_actions = variable_get('pm_restrict_actions', array());
   foreach ($restrict_actions as $action) {
+    if ($action['enabled'] == 0) {
+      continue;
+    }
     $action_authors = _privatemsg_parse_userstring($action['author']);
-    if (_pm_restrict_is_subset_of($author, $action_authors)) {
+    if (_pm_restrict_is_subset_of($author, $action_authors[0])) {
       $action_recipients = _privatemsg_parse_userstring($action['recipient']);
       foreach ($recipients as $recipient_id => $recipient) {
-        if (_pm_restrict_is_subset_of($recipient, $action_recipients)) {
+        if (!_pm_restrict_is_subset_of($recipient, $action_recipients[0])) {
           $blocked[$recipient_id] = array(
             'recipient' => $recipient_id,
-            'message' => t('Not allowed to write messages to *recipient'),
+            'message' => t('You are not permitted to send messages to !user.', array('!user' => privatemsg_recipient_format($recipient))),
             );
+        } elseif (isset($blocked[$recipient_id])) {
+          // Recipient was blocked by a previous rule which will now be overruled
+          unset($blocked[$recipient_id]);
         }
       }
     }
