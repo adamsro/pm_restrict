@@ -77,7 +77,8 @@ function theme_pm_restrict_actions($form) {
   $form_data = element_children($form['form']);
 
   foreach ($form_data as $key) {
-    $output = '<p>' . t("Since all users have the role 'authenticated user', the 'authenticated user' role will be repurposed. The 'authenticated user' role will act to select the set of users who have no other roles aside from 'authenticated user'.") . '</p>';
+    $output = '<ul><li>' . t("If multiple restriction rules apply to an author. The last rule applied will take precedence.") . '</li><li>' .
+     t("Since all users have the role 'authenticated user', the 'authenticated user' role will be repurposed. The 'authenticated user' role will act to select the set of users who have no other roles aside from 'authenticated user'.") . '</li></ul>';
     // Build the table row.
     $row = array(
       'data' => array(
@@ -210,32 +211,36 @@ function pm_restrict_query_privatemsg_autocomplete_alter($query) {
           $uids[] = $set->uid;
         }
         elseif ($set->type == 'role') {
-          $rids[] = $set->rid;
+          if ($set->rid === DRUPAL_AUTHENTICATED_RID) {
+            $only_authenticated  = TRUE;
+          }
+          else {
+           $rids[] = $set->rid;
+          }
         }
         elseif (strpos($set->type, 'og:') !== FALSE) {
           $gids[] = $set->vid;
         }
       }
-    // If there are any, limit any listed users.
+      $where = db_or();
+      // If there are any, limit any listed users.
       if (!empty($uids)) {
-        $query->condition('u.uid', $uids, 'IN');
+        $where->condition('u.uid', $uids, 'IN');
       }
-    // If there are any, limit users in restriced roles.
+      // If there are any, limit users in restricted roles.
       if (!empty($rids)) {
         $join_alias = $query->leftJoin('users_roles', 'ur', 'u.uid = ur.uid');
-        $query->condition(db_or()
-          ->condition($join_alias . '.rid', $rids, 'IN')
-          ->isNull($join_alias . '.rid')
-          );
+        $where->condition($join_alias . '.rid', $rids, 'IN');
+        if ($only_authenticated) {
+          $where->isNull($join_alias . '.rid');
+        }
       }
-    // If there are any, limit users in restricted groups.
+      // If there are any, limit users in restricted groups.
       if (!empty($gids)) {
         $join_alias = $query->leftJoin('og_membership', 'ogm', 'u.uid = ogm.etid');
-        $query->condition(db_or()
-          ->condition($join_alias . '.gid', $gids, 'IN')
-          ->isNull($join_alias . '.gid')
-          );
+        $where->condition($join_alias . '.gid', $gids, 'IN');
       }
+      $query->condition($where);
     }
   }
 }
