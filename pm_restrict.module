@@ -77,7 +77,7 @@ function theme_pm_restrict_actions($form) {
   $form_data = element_children($form['form']);
 
   foreach ($form_data as $key) {
-    $output = '<p>' . t("Since all users have the role 'authenticated user', restricting users so they may only send to 'authenticated user' will function to prevent these users from sending messages to users who have any roles in addition to 'authenticated user'.") . '</p>';
+    $output = '<p>' . t("Since all users have the role 'authenticated user', the 'authenticated user' role will be repurposed. The 'authenticated user' role will act to select the set of users who have no other roles aside from 'authenticated user'.") . '</p>';
     // Build the table row.
     $row = array(
       'data' => array(
@@ -132,10 +132,9 @@ function _pm_restrict_is_subset_of($account, $set) {
       return TRUE;
     }
     elseif ($object->type == 'role' && $object->rid == DRUPAL_AUTHENTICATED_RID && count($account->roles) == 0) {
-      // All users are 'authenticated users' even though this relationship is
-      // not explicitly stored in the database.
-      // Special behavior for 'authenticated user' role. If set is role
-      // 'authenticated user' only return true if account has no other roles.
+      // All users are 'authenticated users' even though this relationship is not explicitly stored in the database.
+      // Special behavior for 'authenticated user' role.
+      // If 'set' is role 'authenticated user' only return true if account has no other roles.
       return TRUE;
     }
     elseif ($object->type == 'role' && isset($account->roles[$object->rid])) {
@@ -155,10 +154,13 @@ function _pm_restrict_is_subset_of($account, $set) {
  * Implements hook_privatemsg_block_message().
  */
 function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
+  if ($user->uid == 1) {
+    return array();
+  }
   $blocked = array();
   $restrict_actions = variable_get('pm_restrict_actions', array());
   foreach ($restrict_actions as $action) {
-    if ($action['enabled'] == 0) {
+    if (!$action['enabled']) {
       continue;
     }
     $action_authors = _privatemsg_parse_userstring($action['author']);
@@ -185,5 +187,50 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
  *
  * Remove blocked users.
  */
- function pm_restrict_query_privatemsg_autocomplete_alter($query) {
- }
+function pm_restrict_query_privatemsg_autocomplete_alter($query) {
+  global $user;
+  if ($user->uid != 1) {
+    $rids = $uids = $gids = array();
+    $restrict_actions = variable_get('pm_restrict_actions', array());
+    foreach ($restrict_actions as $action) {
+      if (!$action['enabled']) {
+        continue;
+      }
+      $action_authors = _privatemsg_parse_userstring($action['author']);
+      if (_pm_restrict_is_subset_of($user, $action_authors[0])) {
+        $action_recipients = _privatemsg_parse_userstring($action['recipient']);
+        foreach ($action_recipients[0] as $set) {
+          if ($object->type == 'user') {
+            $uids[] = $set->uid;
+          }
+          elseif ($set->type == 'role') {
+            $rids[] = $set->rid;
+          }
+          elseif (strpos($object->type, 'og:') !== FALSE) {
+            $gids[] = $set->vid;
+          }
+        }
+      }
+    }
+    // If there are any, limit any listed users.
+    if (!empty($uids)) {
+      $query->condition('u.uid', $uids, 'NOT IN');
+    }
+    // If there are any, limit users in restriced roles.
+    if (!empty($rids)) {
+      $join_alias = $query->leftJoin('users_roles', 'ur', 'u.uid = ur.uid');
+      $query->condition(db_or()
+        ->condition($join_alias . '.rid', $rids, 'NOT IN')
+        ->isNull($join_alias . '.rid')
+        );
+    }
+    // If there are any, limit users in restricted groups.
+    if (!empty($gids)) {
+      $join_alias = $query->leftJoin('og_membership', 'ogm', 'u.uid = ogm.etid');
+      $query->condition(db_or()
+        ->condition($join_alias . '.gid', $gids, 'NOT IN')
+        ->isNull($join_alias . '.gid')
+        );
+    }
+  }
+}
