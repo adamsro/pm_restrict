@@ -190,7 +190,7 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
 function pm_restrict_query_privatemsg_autocomplete_alter($query) {
   global $user;
   if ($user->uid != 1) {
-    $rids = $uids = $gids = array();
+    $last_recipient_set = array();
     $restrict_actions = variable_get('pm_restrict_actions', array());
     foreach ($restrict_actions as $action) {
       if (!$action['enabled']) {
@@ -198,39 +198,44 @@ function pm_restrict_query_privatemsg_autocomplete_alter($query) {
       }
       $action_authors = _privatemsg_parse_userstring($action['author']);
       if (_pm_restrict_is_subset_of($user, $action_authors[0])) {
-        $action_recipients = _privatemsg_parse_userstring($action['recipient']);
-        foreach ($action_recipients[0] as $set) {
-          if ($object->type == 'user') {
-            $uids[] = $set->uid;
-          }
-          elseif ($set->type == 'role') {
-            $rids[] = $set->rid;
-          }
-          elseif (strpos($object->type, 'og:') !== FALSE) {
-            $gids[] = $set->vid;
-          }
-        }
+        $last_recipient_set = $action['recipient'];
       }
     }
+    if (!empty($last_recipient_set)) {
+    // Only restrict to the last rule author is subject to.
+      $action_recipients = _privatemsg_parse_userstring($last_recipient_set);
+      $uids = $rids = $gids = array();
+      foreach ($action_recipients[0] as $set) {
+        if ($set->type == 'user') {
+          $uids[] = $set->uid;
+        }
+        elseif ($set->type == 'role') {
+          $rids[] = $set->rid;
+        }
+        elseif (strpos($set->type, 'og:') !== FALSE) {
+          $gids[] = $set->vid;
+        }
+      }
     // If there are any, limit any listed users.
-    if (!empty($uids)) {
-      $query->condition('u.uid', $uids, 'NOT IN');
-    }
+      if (!empty($uids)) {
+        $query->condition('u.uid', $uids, 'IN');
+      }
     // If there are any, limit users in restriced roles.
-    if (!empty($rids)) {
-      $join_alias = $query->leftJoin('users_roles', 'ur', 'u.uid = ur.uid');
-      $query->condition(db_or()
-        ->condition($join_alias . '.rid', $rids, 'NOT IN')
-        ->isNull($join_alias . '.rid')
-        );
-    }
+      if (!empty($rids)) {
+        $join_alias = $query->leftJoin('users_roles', 'ur', 'u.uid = ur.uid');
+        $query->condition(db_or()
+          ->condition($join_alias . '.rid', $rids, 'IN')
+          ->isNull($join_alias . '.rid')
+          );
+      }
     // If there are any, limit users in restricted groups.
-    if (!empty($gids)) {
-      $join_alias = $query->leftJoin('og_membership', 'ogm', 'u.uid = ogm.etid');
-      $query->condition(db_or()
-        ->condition($join_alias . '.gid', $gids, 'NOT IN')
-        ->isNull($join_alias . '.gid')
-        );
+      if (!empty($gids)) {
+        $join_alias = $query->leftJoin('og_membership', 'ogm', 'u.uid = ogm.etid');
+        $query->condition(db_or()
+          ->condition($join_alias . '.gid', $gids, 'IN')
+          ->isNull($join_alias . '.gid')
+          );
+      }
     }
   }
 }
