@@ -61,7 +61,7 @@ function pm_restrict_theme() {
 }
 
 /**
- * Theme the user actions form.
+ * Theme the user actions form in the admin area.
  *
  * @ingroup theming
  */
@@ -126,41 +126,6 @@ function theme_pm_restrict_actions($form) {
 }
 
 /**
- * Determine if a user is a part of a role or group
- *  using 'load_recipients' would be more portable but less efficient
- *
- * @param  $user
- *  Drupal account object
- * @param  $set
- *   array result of _privatemsg_parse_userstring
- * @return
- *   TRUE if user is a member of the given set.
- */
-function _pm_restrict_is_subset_of($account, $set) {
-  foreach ($set as $object) {
-    if ($object->type == 'user' && $account->uid == $object->uid) {
-      return TRUE;
-    }
-    elseif ($object->type == 'role' && $object->rid == DRUPAL_AUTHENTICATED_RID && count($account->roles) == 0) {
-      // All users are 'authenticated users' even though this relationship is not explicitly stored in the database.
-      // Special behavior for 'authenticated user' role.
-      // If 'set' is role 'authenticated user' only return true if account has no other roles.
-      return TRUE;
-    }
-    elseif ($object->type == 'role' && isset($account->roles[$object->rid])) {
-      return TRUE;
-    }
-    elseif (strpos($object->type, 'og:') !== FALSE) {
-      if (function_exists('og_is_member')
-        && og_is_member(str_replace('og:', '', $object->type), $object->vid, 'user', $account) == TRUE) {
-        return TRUE;
-      }
-    }
-  }
-  return FALSE;
-}
-
-/**
  * Implements hook_privatemsg_block_message().
  */
 function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
@@ -181,31 +146,6 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
     }
   }
   return $blocked;
-}
-
-/**
- * Get the list of allowed recipients for a given author.
- * @param  [type] $account [description]
- * @return array
- *   result form _privatemsg_parse_userstring or empty array
- */
-function _pm_restrict_get_last_rule($account) {
-  $last_recipient_set = array();
-  $restrict_actions = variable_get('pm_restrict_actions', array());
-  foreach ($restrict_actions as $action) {
-    if (!$action['enabled']) {
-      continue;
-    }
-    $action_authors = _privatemsg_parse_userstring($action['author']);
-    if (_pm_restrict_is_subset_of($account, $action_authors[0])) {
-      $last_recipient_set = $action['recipient'];
-    }
-  }
-    // Only restrict to the last rule author is subject to.
-  if (!empty($last_recipient_set)) {
-    $last_recipient_set = _privatemsg_parse_userstring($last_recipient_set);
-  }
-  return $last_recipient_set;
 }
 
 /**
@@ -279,5 +219,65 @@ function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
       }
     }
   }
+}
+
+/**
+ * Get the list of allowed recipients for a given author.
+ * @param  [type] $account [description]
+ * @return array
+ *   result form _privatemsg_parse_userstring or empty array
+ */
+function _pm_restrict_get_last_rule($account) {
+  $last_recipient_set = array();
+  $restrict_actions = variable_get('pm_restrict_actions', array());
+  foreach ($restrict_actions as $action) {
+    if (!$action['enabled']) {
+      continue;
+    }
+    $action_authors = _privatemsg_parse_userstring($action['author']);
+    if (_pm_restrict_is_subset_of($account, $action_authors[0])) {
+      $last_recipient_set = $action['recipient'];
+    }
+  }
+    // Only restrict to the last rule author is subject to.
+  if (!empty($last_recipient_set)) {
+    $last_recipient_set = _privatemsg_parse_userstring($last_recipient_set);
+  }
+  return $last_recipient_set;
+}
+
+/**
+ * Determine if a user is a part of a role or group
+ *  using 'load_recipients' would be more portable but less efficient
+ *
+ * @param  $user
+ *  Drupal account object
+ * @param  $set
+ *   array result of _privatemsg_parse_userstring
+ * @return
+ *   TRUE if user is a member of the given set.
+ */
+function _pm_restrict_is_subset_of($account, $set) {
+  foreach ($set as $object) {
+    if ($object->type == 'user' && $account->uid == $object->uid) {
+      return TRUE;
+    }
+    elseif ($object->type == 'role' && $object->rid == DRUPAL_AUTHENTICATED_RID && count($account->roles) == 0) {
+      // All users are 'authenticated users' even though this relationship is not explicitly stored in the database.
+      // Special behavior for 'authenticated user' role.
+      // If 'set' is role 'authenticated user' only return true if account has no other roles.
+      return TRUE;
+    }
+    elseif ($object->type == 'role' && isset($account->roles[$object->rid])) {
+      return TRUE;
+    }
+    elseif (strpos($object->type, 'og:') !== FALSE) {
+      if (function_exists('og_is_member')
+        && og_is_member(str_replace('og:', '', $object->type), $object->vid, 'user', $account) == TRUE) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
 }
 
