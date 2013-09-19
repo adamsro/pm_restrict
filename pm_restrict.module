@@ -77,7 +77,7 @@ function theme_pm_restrict_actions($form) {
   );
   $form_data = element_children($form['form']);
 
-    $output = '<ul><li>' . t("If multiple restriction rules apply to an author. The last rule applied will take precedence.") . '</li><li>' .
+    $output = '<ul><li>' . t("If multiple restriction rules apply to an author then the last rule applied will take precedence.") . '</li><li>' .
      t("Since all users have the role 'authenticated user', the 'authenticated user' role will be repurposed. The 'authenticated user' role will act to select the set of users who have no other roles aside from 'authenticated user'.") . '</li></ul>';
 
    // this function is what brings in the javascript to make our table drag-and-droppable
@@ -212,12 +212,16 @@ function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
   if ($user->uid != 1) {
     $last_recipient_set = _pm_restrict_get_last_rule($user);
     if (!empty($last_recipient_set)) {
+      $rids = array();
       foreach ($last_recipient_set[0] as $set) {
         if ($set->type == 'role') {
           $rids[] = $set->rid;
         }
       }
-      if (!empty($rids)) {
+      if (empty($rids)) {
+        $query->isNull('role.rid');
+      }
+      else {
         $query->condition(db_or()->condition('role.rid', $rids, 'IN'));
       }
     }
