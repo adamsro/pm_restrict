@@ -59,6 +59,12 @@ function _pm_restrict_actions_form($details) {
     '#type' => 'checkbox',
     '#default_value' => (isset($details['enabled']) ? $details['enabled'] : TRUE),
   );
+  $form['weight'] = array(
+    '#type' => 'weight',
+    '#delta' => 10,
+    '#default_value' => (isset($details['weight']) ? $details['weight'] : TRUE),
+    '#attributes' => array('class' => array('restrict-weight')),
+  );
   $form['remove'] = array(
     '#type' => 'submit',
     '#submit' => array('pm_restrict_remove_submit'),
@@ -71,7 +77,6 @@ function _pm_restrict_actions_form($details) {
       'wrapper' => 'block-actions',
     ),
   );
-
   return $form;
 }
 
@@ -89,7 +94,7 @@ function _pm_restrict_actions_form($details) {
  */
 function _pm_restrict_settings_filter($settings) {
   // Add-in the names of any settings to be saved into the array below.
-  $save_keys = array('author', 'recipient', 'action', 'enabled');
+  $save_keys = array('author', 'recipient', 'action', 'enabled', 'weight');
   $matching = array();
   // Run through each of the keys we want to save, creating a new array.
   // It's not possible to simply check for unwanted values and unset() them as
