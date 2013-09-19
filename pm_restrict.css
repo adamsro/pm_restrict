@@ -11,7 +11,6 @@
   z-index: 1;
 }
 #add-rule-button label {
-  display: inline-block;
   line-height: 26px;
   margin-left: 2px;
 }
