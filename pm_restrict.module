@@ -138,7 +138,7 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
   }
   $blocked = array();
   foreach ($recipients as $recipient_id => $recipient) {
-    if (!_pm_restrict_is_subset_of($recipient, $last_recipient_set[0])) {
+    if (!_pm_restrict_user_is_subset_of($recipient, $last_recipient_set[0])) {
       $blocked[] = array(
         'recipient' => $recipient_id,
         'message' => t('You are not permitted to send messages to !user.', array('!user' => privatemsg_recipient_format($recipient))),
@@ -233,7 +233,7 @@ function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
 *
 * Remove restricted groups from the autocomplete list.
 */
-function pm_restrict_privatemsg_autocomplete_alter($matches, $names, $fragment) {
+function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment) {
   global $user;
   if(module_exists('privatemsg_groups')) {
     $last_set = _pm_restrict_get_last_rule($user);
@@ -260,7 +260,7 @@ function _pm_restrict_get_last_rule($account) {
       continue;
     }
     $action_authors = _privatemsg_parse_userstring($action['author']);
-    if (_pm_restrict_is_subset_of($account, $action_authors[0])) {
+    if (_pm_restrict_user_is_subset_of($account, $action_authors[0])) {
       $last_recipient_set = $action['recipient'];
     }
   }
@@ -282,7 +282,7 @@ function _pm_restrict_get_last_rule($account) {
  * @return
  *   TRUE if user is a member of the given set.
  */
-function _pm_restrict_is_subset_of($account, $set) {
+function _pm_restrict_user_is_subset_of($account, $set) {
   foreach ($set as $object) {
     if ($object->type == 'user' && $account->uid == $object->uid) {
       return TRUE;
