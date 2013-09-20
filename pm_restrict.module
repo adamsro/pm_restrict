@@ -39,8 +39,15 @@ function pm_restrict_menu() {
     'type'             => MENU_LOCAL_TASK,
   );
   $items['messages/restrict/js'] = array(
-    'title'            => 'Javascript block actions form',
+    'title'            => 'Javascript restrict actions form',
     'page callback'    => 'pm_restrict_js',
+    'file'             => 'pm_restrict.admin.inc',
+    'access arguments' => array('administer privatemsg settings'),
+    'type'             => MENU_CALLBACK,
+  );
+  // Auto-completes available user names & removes duplicates.
+  $items['messages/restrict/autocomplete'] = array(
+    'page callback'    => 'pm_restrict_autocomplete',
     'file'             => 'pm_restrict.admin.inc',
     'access arguments' => array('administer privatemsg settings'),
     'type'             => MENU_CALLBACK,
@@ -129,7 +136,7 @@ function theme_pm_restrict_actions($form) {
  * Implements hook_privatemsg_block_message().
  */
 function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
-  if ($user->uid == 1) {
+  if ($author->uid == 1) {
     return array();
   }
   $last_recipient_set = _pm_restrict_get_last_rule($author);

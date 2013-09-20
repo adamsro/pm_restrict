@@ -32,15 +32,13 @@ function _pm_restrict_actions_form($details) {
 
   $form['author'] = array(
     '#type' => 'textfield',
-    // '#title' => t('u'),
-    '#autocomplete_path' => 'messages/autocomplete',
+    '#autocomplete_path' => 'messages/restrict/autocomplete',
     '#default_value' => (isset($details['author']) ? $details['author'] : ''),
     '#disabled' => $row_disabled,
   );
   $form['recipient'] = array(
     '#type' => 'textfield',
-    // '#title' => t('u'),
-    '#autocomplete_path' => 'messages/autocomplete',
+    '#autocomplete_path' => 'messages/restrict/autocomplete',
     '#default_value' => (isset($details['recipient']) ? $details['recipient'] : ''),
     '#disabled' => $row_disabled,
   );
@@ -216,6 +214,25 @@ function pm_restrict_settings($form, &$form_state) {
 }
 
 /**
+ * Validate handler for admin form. Make sure all options in author and recip strings are valid.
+ */
+function pm_restrict_settings_validate($form, &$form_state) {
+  // We don't want it to submit when we're adding/removing actions.
+  if ($form_state['clicked_button']['#id'] == 'edit-submit-form' && isset($form_state['values']['block_actions'])) {
+    foreach ($form_state['values']['block_actions'] as $key => $action) {
+      list($valid, $invalid, $duplicates, $denieds) = _privatemsg_parse_userstring($form_state['values']['block_actions'][$key]['author']);
+      if (!empty($invalid)) {
+        form_set_error('block_actions][' . $key . '][author', t('The following items are invalid: @invalid.', array('@invalid' => implode(", ", $invalid))));
+      }
+      list($valid, $invalid, $duplicates, $denieds) = _privatemsg_parse_userstring($form_state['values']['block_actions'][$key]['recipient']);
+      if (!empty($invalid)) {
+        form_set_error('block_actions][' . $key . '][recipient', t('The following items are invalid: @invalid.', array('@invalid' => implode(", ", $invalid))));
+      }
+    }
+  }
+}
+
+/**
  * Submit handler for admin form.
  */
 function pm_restrict_settings_submit($form, &$form_state) {
@@ -238,4 +255,82 @@ function pm_restrict_settings_submit($form, &$form_state) {
     }
     drupal_set_message(t('The configuration options have been saved.'));
   }
+}
+
+/**
+ * Return autocomplete results for usernames.
+ *  Modified so all completions are available to anyone with privatemsg admin privileges.
+ *
+ * Prevents usernames from being used and/or suggested twice.
+ */
+function pm_restrict_autocomplete($string) {
+  $names = array();
+  // 1: Parse $string and build list of valid user names.
+  $fragments = explode(',', $string);
+  foreach ($fragments as $name) {
+    if ($name = trim($name)) {
+      $names[$name] = $name;
+    }
+  }
+  // 2: Find the next user name suggestion.
+  $fragment = array_pop($names);
+  $matches = array();
+  if (!empty($fragment)) {
+    $remaining = 10;
+    $types = privatemsg_recipient_get_types();
+    foreach ($types as $name => $type) {
+      if (isset($type['autocomplete']) && is_callable($type['autocomplete'])) {
+        $function = $type['autocomplete'];
+        $return = $function($fragment, $names, $remaining, $name);
+        if (is_array($return) && !empty($return)) {
+          $matches = array_merge($matches, $return);
+        }
+        $remaining = 10 - count($matches);
+        if ($remaining <= 0) {
+          break;
+        }
+      }
+    }
+  }
+
+  // remove user 1, this user will always have all privileges.
+  foreach ($matches as $key => $match) {
+    if ($match->type == 'user' && $match->uid == 1) {
+      unset($matches[$key]);
+    }
+  }
+  // we want to see all options for admin area.
+  // drupal_alter('privatemsg_autocomplete', $matches, $names, $fragment);
+
+  // Format the suggestions.
+  $themed_matches = array();
+  foreach ($matches as $key => $match) {
+    $themed_matches[$key] = privatemsg_recipient_format($match, array('plain' => TRUE));
+  }
+
+  // Check if there are any duplicates.
+  if (count(array_unique($themed_matches)) != count($themed_matches)) {
+    // Loop over matches, look for duplicates of each one.
+    foreach ($themed_matches as $themed_match) {
+      $duplicate_keys = array_keys($themed_matches, $themed_match);
+      if (count($duplicate_keys) > 1) {
+        // There are duplicates, make them unique.
+        foreach ($duplicate_keys as $duplicate_key) {
+          // Reformat them with unique argument.
+          $themed_matches[$duplicate_key] = privatemsg_recipient_format($matches[$duplicate_key], array('plain' => TRUE, 'unique' => TRUE));
+        }
+      }
+    }
+  }
+
+  // Prefix the matches and convert them to the correct form for the
+  // autocomplete.
+  $prefix = count($names) ? implode(", ", $names) . ", " : '';
+  $suggestions = array();
+  foreach ($themed_matches as $match) {
+    $suggestions[$prefix . $match . ', '] = $match;
+  }
+
+  // convert to object to prevent drupal bug, see http://drupal.org/node/175361
+  drupal_json_output((object)$suggestions);
 }
