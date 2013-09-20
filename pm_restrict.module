@@ -229,6 +229,24 @@ function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
 }
 
 /**
+* Implements hook_privatemsg_autocomplete_alter().
+*
+* Remove restricted groups from the autocomplete list.
+*/
+function pm_restrict_privatemsg_autocomplete_alter($matches, $names, $fragment) {
+  global $user;
+  if(module_exists('privatemsg_groups')) {
+    $last_set = _pm_restrict_get_last_rule($user);
+    foreach ($matches as $key => $match) {
+      if (strpos($match->type, 'og:') !== FALSE && !_pm_resrict_group_is_in_set($match, $last_set[0])) {
+        unset($matches[$key]);
+      }
+    }
+  }
+
+}
+
+/**
  * Get the list of allowed recipients for a given author.
  * @param  [type] $account [description]
  * @return array
@@ -289,3 +307,22 @@ function _pm_restrict_is_subset_of($account, $set) {
   }
   return FALSE;
 }
+
+/**
+ * Determine if a group is in an array of results.
+ * @param  object $group
+ *  object describing an organic group
+ * @param  array $set
+ *  mixed set may contain users, roles, and groups
+ * @return bool
+ *  TRUE if group is an element in $set
+ */
+function _pm_resrict_group_is_in_set($group, $set) {
+  foreach ($set as $s) {
+    if ($group->vid == $s->vid) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
