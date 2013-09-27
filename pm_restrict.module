@@ -133,23 +133,47 @@ function theme_pm_restrict_actions($form) {
 }
 
 /**
- * Implements hook_privatemsg_block_message().
- */
-function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
-  if ($author->uid == 1) {
-    return array();
-  }
-  $last_recipient_set = _pm_restrict_get_last_rule($author);
-  if (empty($last_recipient_set[0])) {
-    return array();
-  }
-  $blocked = array();
-  foreach ($recipients as $recipient_id => $recipient) {
-    if (!_pm_restrict_user_is_subset_of($recipient, $last_recipient_set[0])) {
-      $blocked[] = array(
-        'recipient' => $recipient_id,
-        'message' => t('You are not permitted to send messages to !user.', array('!user' => privatemsg_recipient_format($recipient))),
+* Change the 'to' field for the privatemsg form for sending a new msg.
+*/
+function pm_restrict_form_alter(&$form, &$form_state, $form_id) {
+  global $user;
+  if ($form_id == 'privatemsg_new') {
+    list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+    if(!empty($last_action) && $last_action['action'] == 1) {
+      $form['recipient'] = array(
+        '#type' => 'textfield',
+        '#title' => t('To'),
+        '#value' => $last_action['recipient'],
+        '#disabled' => TRUE,
+        '#weight' => -10,
+        '#size' => 50,
+        // Disable #maxlength, make it configurable by number of recipients, not
+        // their name length.
+        '#after_build'        => array('privatemsg_disable_maxlength'),
         );
+       // $form['#validate'][] = 'pm_restrict_privatemsg_new_validate';
+    }
+  }
+}
+
+function pm_restrict_privatemsg_new_validate($form, &$form_state) {
+}
+/**
+* Implements hook_privatemsg_block_message().
+*/
+function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
+  $blocked = array();
+  if ($author->uid != 1) {
+    list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($author);
+    if (!empty($last_recipient_set)) {
+      foreach ($recipients as $recipient_id => $recipient) {
+        if (!_pm_restrict_user_is_subset_of($recipient, $last_recipient_set)) {
+          $blocked[] = array(
+            'recipient' => $recipient_id,
+            'message' => t('You are not permitted to send messages to !user.', array('!user' => privatemsg_recipient_format($recipient))),
+            );
+        }
+      }
     }
   }
   return $blocked;
@@ -163,11 +187,11 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
 function pm_restrict_query_privatemsg_autocomplete_alter($query) {
   global $user;
   if ($user->uid != 1) {
-    $last_recipient_set = _pm_restrict_get_last_rule($user);
+    list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
     if (!empty($last_recipient_set)) {
       // Only restrict to the last rule author is subject to.
       $uids = $rids = $gids = array();
-      foreach ($last_recipient_set[0] as $set) {
+      foreach ($last_recipient_set as $set) {
         if ($set->type == 'user') {
           $uids[] = $set->uid;
         }
@@ -217,10 +241,10 @@ function pm_restrict_query_privatemsg_autocomplete_alter($query) {
 function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
   global $user;
   if ($user->uid != 1) {
-    $last_recipient_set = _pm_restrict_get_last_rule($user);
+    list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
     if (!empty($last_recipient_set)) {
       $rids = array();
-      foreach ($last_recipient_set[0] as $set) {
+      foreach ($last_recipient_set as $set) {
         if ($set->type == 'role') {
           $rids[] = $set->rid;
         }
@@ -243,9 +267,9 @@ function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
 function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment) {
   global $user;
   if(module_exists('privatemsg_groups')) {
-    $last_set = _pm_restrict_get_last_rule($user);
+     list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
     foreach ($matches as $key => $match) {
-      if (strpos($match->type, 'og:') !== FALSE && !_pm_resrict_group_is_in_set($match, $last_set[0])) {
+      if (strpos($match->type, 'og:') !== FALSE && !_pm_resrict_group_is_in_set($match, $last_recipient_set)) {
         unset($matches[$key]);
       }
     }
@@ -260,7 +284,7 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
  *   result form _privatemsg_parse_userstring or empty array
  */
 function _pm_restrict_get_last_rule($account) {
-  $last_recipient_set = array();
+  $return = $last_recipient_set = $last_action = array();
   $restrict_actions = variable_get('pm_restrict_actions', array());
   foreach ($restrict_actions as $action) {
     if (!$action['enabled']) {
@@ -269,13 +293,15 @@ function _pm_restrict_get_last_rule($account) {
     $action_authors = _privatemsg_parse_userstring($action['author']);
     if (_pm_restrict_user_is_subset_of($account, $action_authors[0])) {
       $last_recipient_set = $action['recipient'];
+      $last_action = $action;
     }
   }
     // Only restrict to the last rule author is subject to.
   if (!empty($last_recipient_set)) {
     $last_recipient_set = _privatemsg_parse_userstring($last_recipient_set);
+    $last_recipient_set = $last_recipient_set[0];
   }
-  return $last_recipient_set;
+  return array($last_recipient_set, $last_action);
 }
 
 /**
@@ -289,30 +315,42 @@ function _pm_restrict_get_last_rule($account) {
  * @return
  *   TRUE if user is a member of the given set.
  */
-function _pm_restrict_user_is_subset_of($account, $set) {
+function _pm_restrict_user_is_subset_of($item, $set) {
   foreach ($set as $object) {
-    if ($object->type == 'user' && $account->uid == $object->uid) {
-      return TRUE;
-    }
-    elseif ($object->type == 'role' && $object->rid == DRUPAL_AUTHENTICATED_RID) {
-      // All users are 'authenticated users' even though this relationship is not explicitly stored in the database.
-      // Special behavior for 'authenticated user' role.
-      // If 'set' is role 'authenticated user' only return true if account has no other roles.
-      if (count($account->roles) == 1) {
+    if (isset($item->uid)) {
+      // Item is a user account and may be a match to iteself or a subset of a role/group
+      if ($object->type == 'user' && $item->uid == $object->uid) {
         return TRUE;
       }
-    }
-    elseif ($object->type == 'role' && isset($account->roles[$object->rid])) {
-      return TRUE;
-    }
-    elseif (strpos($object->type, 'og:') !== FALSE) {
-      if (function_exists('og_is_member')
-        && og_is_member(str_replace('og:', '', $object->type), $object->vid, 'user', $account) == TRUE) {
+      elseif ($object->type == 'role' && $object->rid == DRUPAL_AUTHENTICATED_RID) {
+        // All users are 'authenticated users' even though this relationship is not explicitly stored in the database.
+        // Special behavior for 'authenticated user' role.
+        // If 'set' is role 'authenticated user' only return true if item has no other roles.
+        if (count($item->roles) == 1) {
+          return TRUE;
+        }
+      }
+      elseif ($object->type == 'role' && isset($item->roles[$object->rid])) {
         return TRUE;
+      }
+      elseif (strpos($object->type, 'og:') !== FALSE) {
+        if (function_exists('og_is_member')
+          && og_is_member(str_replace('og:', '', $object->type), $object->vid, 'user', $item) == TRUE) {
+          return TRUE;
       }
     }
   }
-  return FALSE;
+  elseif ($item->type = 'role' && $object->type == 'role' && $item->rid == $object->rid) {
+  // Item is a role and may only be a subset of iteself.
+   return TRUE;
+  }
+  elseif (strpos($item->type, 'og:') !== FALSE && strpos($object->type, 'og:') !== FALSE && $item->vid == $object->vid) {
+  // Item is a group and may only be a subset of iteself.
+   return TRUE;
+
+  }
+}
+return FALSE;
 }
 
 /**

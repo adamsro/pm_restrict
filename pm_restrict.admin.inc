@@ -215,6 +215,7 @@ function pm_restrict_settings($form, &$form_state) {
 
 /**
  * Validate handler for admin form. Make sure all options in author and recip strings are valid.
+ * TODO: Does not find duplicates.
  */
 function pm_restrict_settings_validate($form, &$form_state) {
   // We don't want it to submit when we're adding/removing actions.
