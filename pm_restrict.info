@@ -1,8 +1,7 @@
-name = Privatemsg Restrict
+name = Private Message Restrict
 description = Restrict possible message recipients based on user/role/group.
 package = Mail
 core = 7.x
 dependencies[] = privatemsg
-files[]=pm_restrict.module
 files[]=pm_restrict.admin.inc
 configure=admin/config/messaging/privatemsg/restrict
