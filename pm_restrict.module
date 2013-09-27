@@ -1,5 +1,4 @@
 <?php
-
 /**
  * @file
  * Allows sending restrictions on users/roles/groups
@@ -139,7 +138,7 @@ function pm_restrict_form_alter(&$form, &$form_state, $form_id) {
   global $user;
   if ($form_id == 'privatemsg_new') {
     list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
-    if(!empty($last_action) && $last_action['action'] == 1) {
+    if(!empty($last_action) && $last_action['action'] == PM_RESTRICT_ALL_RECIPIENTS) {
       $form['recipient'] = array(
         '#type' => 'textfield',
         '#title' => t('To'),
@@ -167,7 +166,7 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
     list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($author);
     if (!empty($last_recipient_set)) {
       foreach ($recipients as $recipient_id => $recipient) {
-        if (!_pm_restrict_user_is_subset_of($recipient, $last_recipient_set)) {
+        if (!_pm_restrict_is_subset_of($recipient, $last_recipient_set)) {
           $blocked[] = array(
             'recipient' => $recipient_id,
             'message' => t('You are not permitted to send messages to !user.', array('!user' => privatemsg_recipient_format($recipient))),
@@ -269,7 +268,7 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
   if(module_exists('privatemsg_groups')) {
      list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
     foreach ($matches as $key => $match) {
-      if (strpos($match->type, 'og:') !== FALSE && !_pm_resrict_group_is_in_set($match, $last_recipient_set)) {
+      if (strpos($match->type, 'og:') !== FALSE && !_pm_restrict_is_subset_of($match, $last_recipient_set)) {
         unset($matches[$key]);
       }
     }
@@ -291,7 +290,7 @@ function _pm_restrict_get_last_rule($account) {
       continue;
     }
     $action_authors = _privatemsg_parse_userstring($action['author']);
-    if (_pm_restrict_user_is_subset_of($account, $action_authors[0])) {
+    if (_pm_restrict_is_subset_of($account, $action_authors[0])) {
       $last_recipient_set = $action['recipient'];
       $last_action = $action;
     }
@@ -315,7 +314,7 @@ function _pm_restrict_get_last_rule($account) {
  * @return
  *   TRUE if user is a member of the given set.
  */
-function _pm_restrict_user_is_subset_of($item, $set) {
+function _pm_restrict_is_subset_of($item, $set) {
   foreach ($set as $object) {
     if (isset($item->uid)) {
       // Item is a user account and may be a match to iteself or a subset of a role/group
@@ -340,34 +339,18 @@ function _pm_restrict_user_is_subset_of($item, $set) {
       }
     }
   }
-  elseif ($item->type = 'role' && $object->type == 'role' && $item->rid == $object->rid) {
-  // Item is a role and may only be a subset of iteself.
-   return TRUE;
+  elseif ($item->type == 'role' && $object->type == 'role') {
+    // Item is a role and may only be a subset of iteself.
+    $rid = isset($item->recipient) ? $item->recipient : $item->rid;
+    if ($rid == $object->rid) {
+      return TRUE;
+    }
   }
   elseif (strpos($item->type, 'og:') !== FALSE && strpos($object->type, 'og:') !== FALSE && $item->vid == $object->vid) {
-  // Item is a group and may only be a subset of iteself.
+    // Item is a group and may only be a subset of iteself.
    return TRUE;
 
   }
 }
 return FALSE;
 }
-
-/**
- * Determine if a group is in an array of results.
- * @param  object $group
- *  object describing an organic group
- * @param  array $set
- *  mixed set may contain users, roles, and groups
- * @return bool
- *  TRUE if group is an element in $set
- */
-function _pm_resrict_group_is_in_set($group, $set) {
-  foreach ($set as $s) {
-    if ($group->vid == $s->vid) {
-      return TRUE;
-    }
-  }
-  return FALSE;
-}
-
