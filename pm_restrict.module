@@ -142,7 +142,7 @@ function pm_restrict_form_alter(&$form, &$form_state, $form_id) {
       $form['recipient'] = array(
         '#type' => 'textfield',
         '#title' => t('To'),
-        '#value' => $last_action['recipient'],
+        '#value' => rtrim($last_action['recipient'], ", "),
         '#disabled' => TRUE,
         '#weight' => -10,
         '#size' => 50,
