@@ -270,7 +270,6 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
       }
     }
   }
-
 }
 
 /**
@@ -286,7 +285,7 @@ function _pm_restrict_get_last_rule($account) {
     if (!$action['enabled']) {
       continue;
     }
-    $action_authors = _privatemsg_parse_userstring($action['author']);
+    $action_authors = _privatemsg_restrict_parse_userstring($action['author']);
     if (_pm_restrict_is_subset_of($account, $action_authors[0])) {
       $last_recipient_set = $action['recipient'];
       $last_action = $action;
@@ -294,7 +293,7 @@ function _pm_restrict_get_last_rule($account) {
   }
     // Only restrict to the last rule author is subject to.
   if (!empty($last_recipient_set)) {
-    $last_recipient_set = _privatemsg_parse_userstring($last_recipient_set);
+    $last_recipient_set = _privatemsg_restrict_parse_userstring($last_recipient_set);
     $last_recipient_set = $last_recipient_set[0];
   }
   return array($last_recipient_set, $last_action);
@@ -347,5 +346,92 @@ function _pm_restrict_is_subset_of($item, $set) {
       return TRUE;
     }
   }
-return FALSE;
+  return FALSE;
+}
+
+/**
+ * Extract the valid usernames of a string and loads them.
+ *
+ * This function is used to parse a string supplied by a username autocomplete
+ * field and load all user objects.
+ *
+ * Function is different from _privatemsg_parse_userstring in that no access checking is present.
+ * this is important for returning users loaded in 'get last rule'
+ *
+ * @param $string
+ *   A string in the form "usernameA, usernameB, ...".
+ * @return $type
+ *   Array of recipient types this should be limited to.
+ *
+ * @return
+ *   Array, first element is an array of loaded user objects, second an array
+ *   with invalid names.
+ *
+ */
+function _privatemsg_restrict_parse_userstring($input, $types_limitations = array()) {
+  if (is_string($input)) {
+    $input = explode(',', $input);
+  }
+
+  // Start working through the input array.
+  $invalid = array();
+  $recipients = array();
+  $duplicates = array();
+  $denieds = array();
+  foreach ($input as $string) {
+    $string = trim($string);
+    // Ignore spaces.
+    if (!empty($string)) {
+
+      // First, collect all matches.
+      $matches = array();
+
+      // Collect matches from hook implementations.
+      foreach (module_implements('privatemsg_name_lookup') as $module) {
+        $function = $module . '_privatemsg_name_lookup';
+        $return = $function($string);
+        if (isset($return) && is_array($return)) {
+          foreach ($return as $recipient) {
+            // Save recipients under their key to merge recipients which were
+            // loaded multiple times.
+            if (empty($recipient->type)) {
+              $recipient->type = 'user';
+              $recipient->recipient = $recipient->uid;
+            }
+            $matches[privatemsg_recipient_key($recipient)] = $recipient;
+          }
+        }
+      }
+
+      foreach ($matches as $key => $recipient) {
+        // Apply limitations.
+        if (!empty($types_limitations) && !in_array($recipient->type, $types_limitations)) {
+          unset($matches[$key]);
+        }
+      }
+
+      // Allow modules to alter the found matches.
+      drupal_alter('privatemsg_name_lookup_matches', $matches, $string);
+
+      // Check if there are any matches.
+      $number_of_matches = count($matches);
+      switch ($number_of_matches) {
+        case 1:
+          // Only a single match found, add to recipients.
+          $recipients += $matches;
+          break;
+        case 0:
+            // The string does not contain any valid recipients.
+            $invalid[$string] = $string;
+          break;
+        default:
+          // Multiple matches were found. The user has to specify which one he
+          // meant.
+          $duplicates[$string] = $matches;
+          break;
+      }
+    }
+  }
+  // Todo: Provide better API.
+  return array($recipients, $invalid, $duplicates);
 }
