@@ -263,6 +263,8 @@ function pm_restrict_settings_submit($form, &$form_state) {
  *  Modified so all completions are available to anyone with privatemsg admin privileges.
  *
  * Prevents usernames from being used and/or suggested twice.
+ *
+ * @see  privatemsg_autocomplete().
  */
 function pm_restrict_autocomplete($string) {
   $names = array();

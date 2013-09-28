@@ -279,6 +279,11 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
  *   result form _privatemsg_parse_userstring or empty array
  */
 function _pm_restrict_get_last_rule($account) {
+  $authors = &drupal_static(__FUNCTION__);
+  if (isset($authors[$account->uid])) {
+    return $authors[$account->uid];
+  }
+
   $return = $last_recipient_set = $last_action = array();
   $restrict_actions = variable_get('pm_restrict_actions', array());
   foreach ($restrict_actions as $action) {
@@ -296,7 +301,7 @@ function _pm_restrict_get_last_rule($account) {
     $last_recipient_set = _privatemsg_restrict_parse_userstring($last_recipient_set);
     $last_recipient_set = $last_recipient_set[0];
   }
-  return array($last_recipient_set, $last_action);
+  return $authors[$account->uid] = array($last_recipient_set, $last_action);
 }
 
 /**
@@ -357,6 +362,8 @@ function _pm_restrict_is_subset_of($item, $set) {
  *
  * Function is different from _privatemsg_parse_userstring in that no access checking is present.
  * this is important for returning users loaded in 'get last rule'
+ *
+ * @see _privatemsg_parse_userstring().
  *
  * @param $string
  *   A string in the form "usernameA, usernameB, ...".
