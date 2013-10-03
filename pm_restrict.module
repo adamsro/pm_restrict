@@ -280,12 +280,12 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
  */
 function _pm_restrict_get_last_rule($account) {
   $last_recipient_set = $last_action = array();
-  if ($account->uid != 1) {
-    $authors = &drupal_static(__FUNCTION__);
-    if (isset($authors[$account->uid])) {
-      return $authors[$account->uid];
-    }
+  $authors = &drupal_static(__FUNCTION__);
+  if (isset($authors[$account->uid])) {
+    return $authors[$account->uid];
+  }
 
+  if ($account->uid != 1) {
     $restrict_actions = variable_get('pm_restrict_actions', array());
     foreach ($restrict_actions as $action) {
       if (!$action['enabled']) {
@@ -303,6 +303,7 @@ function _pm_restrict_get_last_rule($account) {
       $last_recipient_set = $last_recipient_set[0];
     }
   }
+
   return $authors[$account->uid] = array($last_recipient_set, $last_action);
 }
 
