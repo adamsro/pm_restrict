@@ -279,12 +279,17 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
  *   result form _privatemsg_parse_userstring or empty array
  */
 function _pm_restrict_get_last_rule($account) {
+  global $user;
+  $return = $last_recipient_set = $last_action = array();
+
+  if ($user->uid == 1) {
+    return $return;
+  }
   $authors = &drupal_static(__FUNCTION__);
   if (isset($authors[$account->uid])) {
     return $authors[$account->uid];
   }
 
-  $return = $last_recipient_set = $last_action = array();
   $restrict_actions = variable_get('pm_restrict_actions', array());
   foreach ($restrict_actions as $action) {
     if (!$action['enabled']) {
@@ -326,7 +331,7 @@ function _pm_restrict_is_subset_of($item, $set) {
       // All users are 'authenticated users' even though this relationship is not explicitly stored in the database.
       // Special behavior for 'authenticated user' role.
       // If 'set' is role 'authenticated user' only return true if item has no other roles.
-        if (count($item->roles) == 1) {
+        if ($item->uid != 1 && count($item->roles) == 1) {
           return TRUE;
         }
       }
