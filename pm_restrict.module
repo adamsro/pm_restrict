@@ -25,6 +25,18 @@ function pm_restrict_help($path) {
 }
 
 /**
+ * Implements hook_permission().
+ */
+function pm_restrict_permission() {
+  return array(
+    'reply to restricted' => array(
+      'title' => t('Reply to restricted'),
+      'description' => t('Allow a user to replay to all recipients in a thread even if restricted from sending a new message to them.'),
+      ),
+    );
+}
+
+/**
  * Implements hook_menu().
  */
 function pm_restrict_menu() {
@@ -160,6 +172,13 @@ function pm_restrict_form_alter(&$form, &$form_state, $form_id) {
 function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
   $blocked = array();
   if ($author->uid != 1) {
+    if (privatemsg_user_access('reply to restricted', $author) && $thread = menu_get_object('privatemsg_thread', 2)) {
+        // Check if user is a recipient of this message, if so return true
+      if ((bool)db_query_range("SELECT 1 FROM {pm_index} WHERE recipient = :uid AND type IN ('user', 'hidden') AND thread_id = :thread_id", 0, 1, array(':uid' => $author->uid, ':thread_id' => $thread['thread_id']))->fetchField()) {
+        return $blocked;
+      }
+    }
+
     list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($author);
     if (!empty($last_recipient_set)) {
       foreach ($recipients as $recipient_id => $recipient) {
