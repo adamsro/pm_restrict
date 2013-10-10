@@ -142,34 +142,53 @@ function theme_pm_restrict_actions($form) {
 }
 
 /**
-* Change the 'to' field for the privatemsg form for sending a new msg.
+* Implements hook_form_FORM_ID_alter().
 */
-function pm_restrict_form_alter(&$form, &$form_state, $form_id) {
+function pm_restrict_form_privatemsg_new_alter(&$form, &$form_state, $form_id) {
+  // Change the 'to' field for the privatemsg form for sending a new msg.
   global $user;
-  if ($form_id == 'privatemsg_new') {
-    list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
-    if (!empty($last_action) && $last_action['action'] == PM_RESTRICT_ALL_RECIPIENTS) {
-      $recipients = '';
-      foreach ($last_recipient_set as $recipient_id => $recipient) {
-        if ($recipient->type == 'role') {
-          $recipients .= $recipient->name . '(s), ';
-        } else {
-        $recipients .= $recipient->name . ', ';
-        }
+  if ($user->id == 1) {
+    return;
+  }
+  list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+  if (!empty($last_action) && $last_action['action'] == PM_RESTRICT_ALL_RECIPIENTS) {
+    array_unshift($form['actions']['submit']['#validate'], 'pm_restrict_privatemsg_new_validate');
+    // $form['#validate'][] = 'pm_restrict_privatemsg_new_validate';
+    // Add an (s) to the role names to avoid confusion
+    $recipients = '';
+    foreach ($last_recipient_set as $recipient_id => $recipient) {
+      if ($recipient->type == 'role') {
+        $recipients .= $recipient->name . '(s), ';
+      } else {
+      $recipients .= $recipient->name . ', ';
       }
-      $form['recipient'] = array(
-        '#type' => 'textfield',
-        '#title' => t('To'),
-        '#value' => rtrim($recipients, ", "),
-        '#disabled' => TRUE,
-        '#weight' => -10,
-        '#size' => 50,
-        // Disable #maxlength, make it configurable by number of recipients, not
-        // their name length.
-        '#after_build'        => array('privatemsg_disable_maxlength'),
-        );
+    }
+    $form['recipient'] = array(
+      '#type' => 'textfield',
+      '#title' => t('To'),
+      '#value' => rtrim($recipients, ", "),
+      '#disabled' => TRUE,
+      '#weight' => -10,
+      '#size' => 50,
+      // Disable #maxlength, make it configurable by number of recipients, not
+      // their name length.
+      '#after_build'        => array('privatemsg_disable_maxlength'),
+      );
+  }
+}
+
+/**
+ * Remove the '(s)' that we added to roles earlier so form may to processed correctly.
+ */
+function pm_restrict_privatemsg_new_validate($form, &$form_state) {
+  global $user;
+  list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+  foreach ($last_recipient_set as $recipient_id => $recipient) {
+    if ($recipient->type == 'role') {
+      $form_state['values']['recipient'] = str_replace($recipient->name . '(s)', $recipient->name, $form_state['values']['recipient']);
     }
   }
+  var_dump($form_state['values']);
 }
 
 /**
@@ -202,10 +221,9 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
 
 /**
 * Implements hook_query_TAG_alter().
-*
-* Include conditionals to limit query to whitelisted users.
 */
 function pm_restrict_query_privatemsg_autocomplete_alter($query) {
+  // Include conditionals to limit query to whitelisted users.
   global $user;
   if ($user->uid == 1) {
     return;
@@ -246,11 +264,10 @@ function pm_restrict_query_privatemsg_autocomplete_alter($query) {
 }
 
 /**
-* Include conditionals to limit query to whitelisted roles.
-*
 * Implements hook_query_TAG_alter().
 */
 function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
+  // Include conditionals to limit query to whitelisted roles.
   global $user;
   if ($user->uid == 1) {
     return;
