@@ -188,7 +188,7 @@ function pm_restrict_privatemsg_new_validate($form, &$form_state) {
       $form_state['values']['recipient'] = str_replace($recipient->name . '(s)', $recipient->name, $form_state['values']['recipient']);
     }
   }
-  var_dump($form_state['values']);
+
 }
 
 /**
