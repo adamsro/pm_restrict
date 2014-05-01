@@ -326,7 +326,7 @@ function _pm_restrict_get_last_rule($account) {
         continue;
       }
       $action_authors = _privatemsg_restrict_parse_userstring($action['author']);
-      if (_pm_restrict_is_subset_of($account, $action_authors[0])) {
+      if (_pm_restrict_is_subset_of($account, $action_authors)) {
         $last_recipient_set = $action['recipient'];
         $last_action = $action;
       }
@@ -334,7 +334,6 @@ function _pm_restrict_get_last_rule($account) {
       // Only restrict to the last rule author is subject to.
     if (!empty($last_recipient_set)) {
       $last_recipient_set = _privatemsg_restrict_parse_userstring($last_recipient_set);
-      $last_recipient_set = $last_recipient_set[0];
     }
   }
 
@@ -451,23 +450,11 @@ function _privatemsg_restrict_parse_userstring($input, $types_limitations = arra
 
       // Check if there are any matches.
       $number_of_matches = count($matches);
-      switch ($number_of_matches) {
-        case 1:
+      if ($number_of_matches > 0) {
           // Only a single match found, add to recipients.
           $recipients += $matches;
-          break;
-        case 0:
-            // The string does not contain any valid recipients.
-            $invalid[$string] = $string;
-          break;
-        default:
-          // Multiple matches were found. The user has to specify which one he
-          // meant.
-          $duplicates[$string] = $matches;
-          break;
+        }
       }
     }
-  }
-  // Todo: Provide better API.
-  return array($recipients, $invalid, $duplicates);
+    return $recipients;
 }
