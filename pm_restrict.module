@@ -1,16 +1,16 @@
 <?php
 /**
  * @file
- * Allows sending restrictions on users/roles/groups
+ * Private Message Restrict allows sending restrictions on users/roles/groups.
  */
 
 /**
- * Allow a user to choose which recipients to send to within the restricted subset.
+ * Allow a user to choose which recipients to send to within restricted subset.
  */
 define('PM_RESTRICT_MULTIPLE_SELECTIONS', 0);
 
 /**
- *  Force a user to send to all recip he/she has been restriced to.
+ *  Force a user to send to all recipients he/she has been restriced to.
  */
 define('PM_RESTRICT_ALL_RECIPIENTS', 1);
 
@@ -96,7 +96,7 @@ function theme_pm_restrict_actions($form) {
   $form_data = element_children($form['form']);
 
   $output = '<ul><li>' . t("If multiple restriction rules apply to an author then the last rule applied will take precedence.") . '</li></ul>' .
-   // this function is what brings in the javascript to make our table drag-and-droppable
+  // Bring in the javascript to make our table drag-and-droppable.
   drupal_add_tabledrag('pm_restrict_table', 'order', 'sibling', 'restrict-weight');
 
   foreach ($form_data as $key) {
@@ -142,25 +142,26 @@ function theme_pm_restrict_actions($form) {
 }
 
 /**
-* Implements hook_form_FORM_ID_alter().
-*/
+ * Implements hook_form_FORM_ID_alter().
+ */
 function pm_restrict_form_privatemsg_new_alter(&$form, &$form_state, $form_id) {
   // Change the 'to' field for the privatemsg form for sending a new msg.
   global $user;
   if ($user->id == 1) {
     return;
   }
-  list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+  list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($user);
   if (!empty($last_action) && $last_action['action'] == PM_RESTRICT_ALL_RECIPIENTS) {
     array_unshift($form['actions']['submit']['#validate'], 'pm_restrict_privatemsg_new_validate');
     // $form['#validate'][] = 'pm_restrict_privatemsg_new_validate';
     // Add an (s) to the role names to avoid confusion
     $recipients = '';
-    foreach ($last_recipient_set as $recipient_id => $recipient) {
+    foreach ($last_recipient_set as $recipient) {
       if ($recipient->type == 'role') {
         $recipients .= $recipient->name . '(s), ';
-      } else {
-      $recipients .= $recipient->name . ', ';
+      }
+      else {
+        $recipients .= $recipient->name . ', ';
       }
     }
     $form['recipient'] = array(
@@ -178,12 +179,12 @@ function pm_restrict_form_privatemsg_new_alter(&$form, &$form_state, $form_id) {
 }
 
 /**
- * Remove the '(s)' that we added to roles earlier so form may to processed correctly.
+ * Remove the '(s)' added to roles names earlier so form is correctly processed.
  */
 function pm_restrict_privatemsg_new_validate($form, &$form_state) {
   global $user;
-  list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
-  foreach ($last_recipient_set as $recipient_id => $recipient) {
+  list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($user);
+  foreach ($last_recipient_set as $recipient) {
     if ($recipient->type == 'role') {
       $form_state['values']['recipient'] = str_replace($recipient->name . '(s)', $recipient->name, $form_state['values']['recipient']);
     }
@@ -192,22 +193,22 @@ function pm_restrict_privatemsg_new_validate($form, &$form_state) {
 }
 
 /**
-* Implements hook_privatemsg_block_message().
-*/
+ * Implements hook_privatemsg_block_message().
+ */
 function pm_restrict_privatemsg_block_message($author, $recipients, $context = array()) {
   $blocked = array();
   if ($author->uid != 1) {
     if (privatemsg_user_access('reply to restricted', $author) && $thread = menu_get_object('privatemsg_thread', 2)) {
-        // Check if user is a recipient of this message, if so return true
+        // Check if user is a recipient of this message, if so return true.
       if ((bool)db_query_range("SELECT 1 FROM {pm_index} WHERE recipient = :uid AND type IN ('user', 'hidden') AND thread_id = :thread_id", 0, 1, array(':uid' => $author->uid, ':thread_id' => $thread['thread_id']))->fetchField()) {
         return $blocked;
       }
     }
 
-    list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($author);
+    list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($author);
     if (!empty($last_recipient_set)) {
-      foreach ($recipients as $recipient_id => $recipient) {
-        if (!_pm_restrict_is_subset_of($recipient, $last_recipient_set)) {
+      foreach ($recipients as $recipient) {
+        if (!pm_restrict_is_subset_of($recipient, $last_recipient_set)) {
           $blocked[] = array(
             'recipient' => $recipient_id,
             'message' => t('You are not permitted to send messages to !user.', array('!user' => privatemsg_recipient_format($recipient))),
@@ -220,15 +221,15 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
 }
 
 /**
-* Implements hook_query_TAG_alter().
-*/
+ * Implements hook_query_TAG_alter().
+ */
 function pm_restrict_query_privatemsg_autocomplete_alter($query) {
   // Include conditionals to limit query to whitelisted users.
   global $user;
   if ($user->uid == 1) {
     return;
   }
-  list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+  list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($user);
   if (!empty($last_recipient_set)) {
     // Only restrict to the last rule author is subject to.
     $uids = $rids = $gids = array();
@@ -264,15 +265,15 @@ function pm_restrict_query_privatemsg_autocomplete_alter($query) {
 }
 
 /**
-* Implements hook_query_TAG_alter().
-*/
+ * Implements hook_query_TAG_alter().
+ */
 function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
   // Include conditionals to limit query to whitelisted roles.
   global $user;
   if ($user->uid == 1) {
     return;
   }
-  list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+  list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($user);
   if (!empty($last_recipient_set)) {
     $rids = array();
     foreach ($last_recipient_set as $set) {
@@ -290,16 +291,16 @@ function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
 }
 
 /**
-* Remove restricted groups from the autocomplete list.
-*
-* Implements hook_privatemsg_autocomplete_alter().
-*/
+ * Implements hook_privatemsg_autocomplete_alter().
+ *
+ * Remove restricted groups from the autocomplete list.
+ */
 function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment) {
   global $user;
   if (module_exists('privatemsg_groups')) {
-     list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+     list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($user);
     foreach ($matches as $key => $match) {
-      if (strpos($match->type, 'og:') !== FALSE && !_pm_restrict_is_subset_of($match, $last_recipient_set)) {
+      if (strpos($match->type, 'og:') !== FALSE && !pm_restrict_is_subset_of($match, $last_recipient_set)) {
         unset($matches[$key]);
       }
     }
@@ -308,11 +309,13 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
 
 /**
  * Get the list of allowed recipients for a given author.
- * @param  [type] $account [description]
+ *
+ * @param  object $account
+ *  Drupal core account object
  * @return array
  *   result form _privatemsg_parse_userstring or empty array
  */
-function _pm_restrict_get_last_rule($account) {
+function pm_restrict_get_last_rule($account) {
   $last_recipient_set = $last_action = array();
   $authors = &drupal_static(__FUNCTION__);
   if (isset($authors[$account->uid])) {
@@ -325,15 +328,15 @@ function _pm_restrict_get_last_rule($account) {
       if (!$action['enabled']) {
         continue;
       }
-      $action_authors = _privatemsg_restrict_parse_userstring($action['author']);
-      if (_pm_restrict_is_subset_of($account, $action_authors)) {
+      $action_authors = pm_restrict_parse_userstring($action['author']);
+      if (pm_restrict_is_subset_of($account, $action_authors)) {
         $last_recipient_set = $action['recipient'];
         $last_action = $action;
       }
     }
       // Only restrict to the last rule author is subject to.
     if (!empty($last_recipient_set)) {
-      $last_recipient_set = _privatemsg_restrict_parse_userstring($last_recipient_set);
+      $last_recipient_set = pm_restrict_parse_userstring($last_recipient_set);
     }
   }
 
@@ -341,20 +344,22 @@ function _pm_restrict_get_last_rule($account) {
 }
 
 /**
-* Determine if a user is a part of a role or group
-*  using 'load_recipients' would be more portable but less efficient
-*
-* @param  $user
-*  Drupal account object
-* @param  $set
-*   array result of _privatemsg_parse_userstring
-* @return
-*   TRUE if user is a member of the given set.
-*/
-function _pm_restrict_is_subset_of($item, $set) {
+ * Determine if a user is a part of a role or group.
+ *
+ * Using 'load_recipients' would be more portable but less efficient.
+ *
+ * @param  $item
+ *  Drupal account object, Drupal role object, or organic group
+ * @param  $set
+ *   array result of _privatemsg_parse_userstring
+ * @return
+ *   TRUE if user is a member of the given set.
+ */
+function pm_restrict_is_subset_of($item, $set) {
   foreach ($set as $object) {
     if (isset($item->uid)) {
-      // Item is a user account and may be a match to iteself or a subset of a role/group
+      // Item is a user account and may be a match to iteself or a subset
+      // of a role/group
       if ($object->type == 'user' && $item->uid == $object->uid) {
         return TRUE;
       }
@@ -388,31 +393,26 @@ function _pm_restrict_is_subset_of($item, $set) {
  * This function is used to parse a string supplied by a username autocomplete
  * field and load all user objects.
  *
- * Function is different from _privatemsg_parse_userstring in that no access checking is present.
- * this is important for returning users loaded in 'get last rule'
+ * Function is different from _privatemsg_parse_userstring in that no access
+ * checking is present. This is important for returning users loaded in
+ * 'get last rule'
  *
- * @see _privatemsg_parse_userstring().
+ * @see _privatemsg_parse_userstring()
  *
  * @param $string
  *   A string in the form "usernameA, usernameB, ...".
- * @return $type
- *   Array of recipient types this should be limited to.
  *
  * @return
- *   Array, first element is an array of loaded user objects, second an array
- *   with invalid names.
+ *
  *
  */
-function _privatemsg_restrict_parse_userstring($input, $types_limitations = array()) {
+function pm_restrict_parse_userstring($input, $types_limitations = array()) {
   if (is_string($input)) {
     $input = explode(',', $input);
   }
 
-  // Start working through the input array.
-  $invalid = array();
   $recipients = array();
-  $duplicates = array();
-  $denieds = array();
+  // Start working through the input array.
   foreach ($input as $string) {
     $string = trim($string);
     // Ignore spaces.
