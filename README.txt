@@ -1,5 +1,3 @@
-Private Message Restrict allows limiting the number of recipients for a user/role/group to another set of users/roles/groups based on a set of rules.  An option exists to force users that match a rule to send to everyone the rule applis to. For example, a rule could exist which would force all users with only the 'authenticated user' to send to all users with role 'administration'.
+Private Message Restrict limits the set of allowed recipients based on a set of rules when a user composes a message. A rule may be applied based on a user's username, role, or organic group and may restrict the user to sending to only other users with specified usernames, having particular roles, or belonging to particular organic groups.  For exmaple a rule could be made which would restrict users with role 'client' to only being able to send to users with role 'firm member'.  If multiple restriction rules apply to an author then the last rule applied will take precedence.
 
-If multiple restriction rules apply to an author then the last rule applied will take precedence.
-
-Since all users have the role 'authenticated user', the 'authenticated user' role will be repurposed. The 'authenticated user' role will act to select the set of users who have no other roles aside from 'authenticated user'.
+One possible application for this module could be in converting private message into more of a filesharing system.
