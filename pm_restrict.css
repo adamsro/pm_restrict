@@ -5,7 +5,8 @@
 #pm-block-user-settings .throbber {
   margin: 4px 0;
 }
-#add-rule-button, #remove-rule-button {
+#add-rule-button,
+#remove-rule-button {
   height: 45px;
   /* Stop the remove button overlapping the sticky header */
   z-index: 1;

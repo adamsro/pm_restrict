@@ -59,7 +59,7 @@ function _pm_restrict_actions_form($details) {
   $form['remove'] = array(
     '#type' => 'submit',
     '#submit' => array('pm_restrict_remove_submit'),
-    '#value' => t('Remove_' . $delta),
+    '#value' => t('Remove_@delta', array('@delta' => $delta)),
     '#attributes' => array('class' => array('remove-action')),
     '#prefix' => '<div id="remove-rule-button">',
     '#suffix' => '<label for="edit-remove">' . t('Remove rule') . '</label></div>',
@@ -207,6 +207,7 @@ function pm_restrict_settings($form, &$form_state) {
 
 /**
  * Validate handler for admin form. Check author and recip. strings are valid.
+ *
  * TODO: Does not find duplicates.
  */
 function pm_restrict_settings_validate($form, &$form_state) {
@@ -256,7 +257,7 @@ function pm_restrict_settings_submit($form, &$form_state) {
  * Modified so all completions are available to anyone with privatemsg admin
  * privileges. Prevents usernames from being used and/or suggested twice.
  *
- * @see  privatemsg_autocomplete().
+ * @see privatemsg_autocomplete()
  */
 function pm_restrict_autocomplete($string) {
   $names = array();
@@ -323,6 +324,6 @@ function pm_restrict_autocomplete($string) {
     $suggestions[$prefix . $match . ', '] = $match;
   }
 
-  // convert to object to prevent drupal bug, see http://drupal.org/node/175361
-  drupal_json_output((object)$suggestions);
+  // Convert to object to prevent drupal bug, see http://drupal.org/node/175361
+  drupal_json_output((object) $suggestions);
 }

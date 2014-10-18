@@ -10,7 +10,7 @@
 define('PM_RESTRICT_MULTIPLE_SELECTIONS', 0);
 
 /**
- *  Force a user to send to all recipients he/she has been restriced to.
+ * Force a user to send to all recipients he/she has been restriced to.
  */
 define('PM_RESTRICT_ALL_RECIPIENTS', 1);
 
@@ -32,8 +32,8 @@ function pm_restrict_permission() {
     'reply to restricted' => array(
       'title' => t('Reply to restricted'),
       'description' => t('Allow a user to replay to all recipients in a thread even if restricted from sending a new message to them.'),
-      ),
-    );
+    ),
+  );
 }
 
 /**
@@ -133,7 +133,7 @@ function theme_pm_restrict_actions($form) {
   $output .= theme('table', array(
     'header' => $headers,
     'rows' => $rows,
-    'attributes' => array('id' => 'pm_restrict_table')
+    'attributes' => array('id' => 'pm_restrict_table'),
   ));
 
   $output .= drupal_render_children($form['form']);
@@ -154,7 +154,7 @@ function pm_restrict_form_privatemsg_new_alter(&$form, &$form_state, $form_id) {
   if (!empty($last_action) && $last_action['action'] == PM_RESTRICT_ALL_RECIPIENTS) {
     array_unshift($form['actions']['submit']['#validate'], 'pm_restrict_privatemsg_new_validate');
     // $form['#validate'][] = 'pm_restrict_privatemsg_new_validate';
-    // Add an (s) to the role names to avoid confusion
+    // Add an (s) to the role names to avoid confusion.
     $recipients = '';
     foreach ($last_recipient_set as $recipient) {
       if ($recipient->type == 'role') {
@@ -174,7 +174,7 @@ function pm_restrict_form_privatemsg_new_alter(&$form, &$form_state, $form_id) {
       // Disable #maxlength, make it configurable by number of recipients, not
       // their name length.
       '#after_build'        => array('privatemsg_disable_maxlength'),
-      );
+    );
   }
 }
 
@@ -199,20 +199,20 @@ function pm_restrict_privatemsg_block_message($author, $recipients, $context = a
   $blocked = array();
   if ($author->uid != 1) {
     if (privatemsg_user_access('reply to restricted', $author) && $thread = menu_get_object('privatemsg_thread', 2)) {
-        // Check if user is a recipient of this message, if so return true.
-      if ((bool)db_query_range("SELECT 1 FROM {pm_index} WHERE recipient = :uid AND type IN ('user', 'hidden') AND thread_id = :thread_id", 0, 1, array(':uid' => $author->uid, ':thread_id' => $thread['thread_id']))->fetchField()) {
+      // Check if user is a recipient of this message, if so return true.
+      if ((bool) db_query_range("SELECT 1 FROM {pm_index} WHERE recipient = :uid AND type IN ('user', 'hidden') AND thread_id = :thread_id", 0, 1, array(':uid' => $author->uid, ':thread_id' => $thread['thread_id']))->fetchField()) {
         return $blocked;
       }
     }
 
     list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($author);
     if (!empty($last_recipient_set)) {
-      foreach ($recipients as $recipient) {
+      foreach ($recipients as $recipient_id => $recipient) {
         if (!pm_restrict_is_subset_of($recipient, $last_recipient_set)) {
           $blocked[] = array(
             'recipient' => $recipient_id,
             'message' => t('You are not permitted to send messages to !user.', array('!user' => privatemsg_recipient_format($recipient))),
-            );
+          );
         }
       }
     }
@@ -298,7 +298,7 @@ function pm_restrict_query_privatemsg_roles_autocomplete_roles_alter($query) {
 function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment) {
   global $user;
   if (module_exists('privatemsg_groups')) {
-     list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($user);
+    list($last_recipient_set, $last_action) = pm_restrict_get_last_rule($user);
     foreach ($matches as $key => $match) {
       if (strpos($match->type, 'og:') !== FALSE && !pm_restrict_is_subset_of($match, $last_recipient_set)) {
         unset($matches[$key]);
@@ -311,9 +311,9 @@ function pm_restrict_privatemsg_autocomplete_alter(&$matches, $names, $fragment)
  * Get the list of allowed recipients for a given author.
  *
  * @param  object $account
- *  Drupal core account object
- * @return array
- *   result form _privatemsg_parse_userstring or empty array
+ *   Drupal core account object.
+ * @return
+ *   result form _privatemsg_parse_userstring or empty array.
  */
 function pm_restrict_get_last_rule($account) {
   $last_recipient_set = $last_action = array();
@@ -334,7 +334,7 @@ function pm_restrict_get_last_rule($account) {
         $last_action = $action;
       }
     }
-      // Only restrict to the last rule author is subject to.
+    // Only restrict to the last rule author is subject to.
     if (!empty($last_recipient_set)) {
       $last_recipient_set = pm_restrict_parse_userstring($last_recipient_set);
     }
@@ -348,10 +348,10 @@ function pm_restrict_get_last_rule($account) {
  *
  * Using 'load_recipients' would be more portable but less efficient.
  *
- * @param  $item
- *  Drupal account object, Drupal role object, or organic group
- * @param  $set
- *   array result of _privatemsg_parse_userstring
+ * @param array $item
+ *   Drupal account object, Drupal role object, or organic group.
+ * @param array $set
+ *   Array result of _privatemsg_parse_userstring.
  * @return
  *   TRUE if user is a member of the given set.
  */
@@ -373,14 +373,14 @@ function pm_restrict_is_subset_of($item, $set) {
       }
     }
     elseif ($item->type == 'role' && $object->type == 'role') {
-    // Item is a role and may only be a subset of iteself.
+      // Item is a role and may only be a subset of iteself.
       $rid = isset($item->recipient) ? $item->recipient : $item->rid;
       if ($rid == $object->rid) {
         return TRUE;
       }
     }
     elseif (strpos($item->type, 'og:') !== FALSE && strpos($object->type, 'og:') !== FALSE && $item->vid == $object->vid) {
-    // Item is a group and may only be a subset of iteself.
+      // Item is a group and may only be a subset of iteself.
       return TRUE;
     }
   }
@@ -399,12 +399,11 @@ function pm_restrict_is_subset_of($item, $set) {
  *
  * @see _privatemsg_parse_userstring()
  *
- * @param $string
+ * @param string $input
  *   A string in the form "usernameA, usernameB, ...".
  *
  * @return
- *
- *
+ *   Array of objects: users, roles, groups
  */
 function pm_restrict_parse_userstring($input, $types_limitations = array()) {
   if (is_string($input)) {
@@ -451,10 +450,10 @@ function pm_restrict_parse_userstring($input, $types_limitations = array()) {
       // Check if there are any matches.
       $number_of_matches = count($matches);
       if ($number_of_matches > 0) {
-          // Only a single match found, add to recipients.
-          $recipients += $matches;
-        }
+        // Only a single match found, add to recipients.
+        $recipients += $matches;
       }
     }
-    return $recipients;
+  }
+  return $recipients;
 }
