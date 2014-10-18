@@ -14,7 +14,7 @@
  * @return array
  *   Part of a form with controls for sending, receiving and actions.
  */
-function _pm_restrict_actions_form($details) {
+function _pm_restrict_actions_form(array $details) {
   $form = array(
     '#tree' => TRUE,
   );
@@ -82,7 +82,7 @@ function _pm_restrict_actions_form($details) {
  *
  * @see pm_restrict_settings_submit()
  */
-function pm_restrict_settings_filter($settings) {
+function pm_restrict_settings_filter(array $settings) {
   // Add-in the names of any settings to be saved into the array below.
   $save_keys = array('author', 'recipient', 'action', 'enabled', 'weight');
   $matching = array();
