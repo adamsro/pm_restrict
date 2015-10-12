@@ -152,44 +152,34 @@ function pm_restrict_form_privatemsg_new_alter(&$form, &$form_state, $form_id) {
   }
   list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
   if (!empty($last_action) && $last_action['action'] == PM_RESTRICT_ALL_RECIPIENTS) {
-    array_unshift($form['actions']['submit']['#validate'], 'pm_restrict_privatemsg_new_validate');
+    // array_unshift($form['actions']['submit']['#validate'], 'pm_restrict_privatemsg_new_validate');
     // $form['#validate'][] = 'pm_restrict_privatemsg_new_validate';
     // Add an (s) to the role names to avoid confusion
     $recipients = '';
     foreach ($last_recipient_set as $recipient_id => $recipient) {
-      if ($recipient->type == 'role') {
-        $recipients .= $recipient->name . '(s), ';
-      } else {
-      $recipients .= $recipient->name . ', ';
-      }
+      $themed = privatemsg_recipient_format($recipient, array('plain' => TRUE));
+      $recipients .= $themed . ', ';
     }
-    $form['recipient'] = array(
-      '#type' => 'textfield',
-      '#title' => t('To'),
-      '#value' => rtrim($recipients, ", "),
-      '#disabled' => TRUE,
-      '#weight' => -10,
-      '#size' => 50,
-      // Disable #maxlength, make it configurable by number of recipients, not
-      // their name length.
-      '#after_build'        => array('privatemsg_disable_maxlength'),
-      );
+
+    $form['recipient']['#type'] = 'textfield';
+    $form['recipient']['#disabled'] = TRUE;
+    $form['recipient']['#value'] = rtrim($recipients, ", ");
   }
 }
 
 /**
  * Remove the '(s)' that we added to roles earlier so form may to processed correctly.
  */
-function pm_restrict_privatemsg_new_validate($form, &$form_state) {
-  global $user;
-  list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
-  foreach ($last_recipient_set as $recipient_id => $recipient) {
-    if ($recipient->type == 'role') {
-      $form_state['values']['recipient'] = str_replace($recipient->name . '(s)', $recipient->name, $form_state['values']['recipient']);
-    }
-  }
+// function pm_restrict_privatemsg_new_validate($form, &$form_state) {
+//   global $user;
+//   list($last_recipient_set, $last_action) = _pm_restrict_get_last_rule($user);
+//   foreach ($last_recipient_set as $recipient_id => $recipient) {
+//     if ($recipient->type == 'role') {
+//       $form_state['values']['recipient'] = str_replace($recipient->name . '(s)', $recipient->name, $form_state['values']['recipient']);
+//     }
+//   }
 
-}
+// }
 
 /**
 * Implements hook_privatemsg_block_message().
@@ -250,7 +240,7 @@ function pm_restrict_query_privatemsg_autocomplete_alter($query) {
       $where->condition('u.uid', $uids, 'IN');
     }
     // If there are any, limit users in restricted roles.
-    if (!empty($rids) && !in_array(DRUPAL_AUTHENTICATED_RID)) {
+    if (!empty($rids) && !in_array(DRUPAL_AUTHENTICATED_RID, $rids)) {
       $join_alias = $query->leftJoin('users_roles', 'ur', 'u.uid = ur.uid');
       $where->condition($join_alias . '.rid', $rids, 'IN');
     }
