@@ -236,12 +236,8 @@ function pm_restrict_settings_submit($form, &$form_state) {
     // rows in the table, so we save an empty array to stop errors in the form
     // builder.
     if (isset($form_state['values']['block_actions'])) {
-      $weight = array();
       $block_actions = pm_restrict_settings_filter($form_state['values']['block_actions']);
-      foreach ($block_actions as $key => $row) {
-        $weight[$key]  = $row['weight'];
-      }
-      array_multisort($block_actions, SORT_DESC, SORT_STRING, $weight);
+      uasort($block_actions, 'drupal_sort_weight');
       variable_set('pm_restrict_actions', $block_actions);
     }
     else {
