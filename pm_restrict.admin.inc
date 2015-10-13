@@ -8,20 +8,13 @@
 /**
  * Builds row of sending, receiving roles and actions that go with them.
  *
- * @param $details
+ * @param array $details
  *   Details of the row: default values and the unique row number (delta).
- * @param $blacklist
- *   When the functionality has been added, this will allow building actions
- *   based on a whitelist or blacklist. The current code only covers the use
- *   case of a blacklist, where blocking everyone is allowed by default and
- *   rules are exceptions to that. Conversely, a whitelist will disallow
- *   blocking by default and rules will configure roles that are allowed to
- *   block.
  *
- * @return
+ * @return array
  *   Part of a form with controls for sending, receiving and actions.
  */
-function _pm_restrict_actions_form($details) {
+function _pm_restrict_actions_form(array $details) {
   $form = array(
     '#tree' => TRUE,
   );
@@ -66,7 +59,7 @@ function _pm_restrict_actions_form($details) {
   $form['remove'] = array(
     '#type' => 'submit',
     '#submit' => array('pm_restrict_remove_submit'),
-    '#value' => t('Remove_' . $delta),
+    '#value' => t('Remove_@delta', array('@delta' => $delta)),
     '#attributes' => array('class' => array('remove-action')),
     '#prefix' => '<div id="remove-rule-button">',
     '#suffix' => '<label for="edit-remove">' . t('Remove rule') . '</label></div>',
@@ -79,18 +72,17 @@ function _pm_restrict_actions_form($details) {
 }
 
 /**
- * Takes an array of settings and filters out anything that's un-needed.
- * Leaving only settings to be saved.
+ * Remove inputs from form leaving only settings to be saved.
  *
- * @param $settings
+ * @param array $settings
  *   The array of settings to filter.
  *
- * @return
+ * @return array
  *   Array of settings, ready to be stored in the database.
  *
  * @see pm_restrict_settings_submit()
  */
-function _pm_restrict_settings_filter($settings) {
+function pm_restrict_settings_filter(array $settings) {
   // Add-in the names of any settings to be saved into the array below.
   $save_keys = array('author', 'recipient', 'action', 'enabled', 'weight');
   $matching = array();
@@ -106,7 +98,7 @@ function _pm_restrict_settings_filter($settings) {
     return $matching;
   }
   else {
-    return array_map('_pm_restrict_settings_filter', $settings);
+    return array_map('pm_restrict_settings_filter', $settings);
   }
 }
 
@@ -214,7 +206,8 @@ function pm_restrict_settings($form, &$form_state) {
 }
 
 /**
- * Validate handler for admin form. Make sure all options in author and recip strings are valid.
+ * Validate handler for admin form. Check author and recip. strings are valid.
+ *
  * TODO: Does not find duplicates.
  */
 function pm_restrict_settings_validate($form, &$form_state) {
@@ -244,7 +237,7 @@ function pm_restrict_settings_submit($form, &$form_state) {
     // builder.
     if (isset($form_state['values']['block_actions'])) {
       $weight = array();
-      $block_actions = _pm_restrict_settings_filter($form_state['values']['block_actions']);
+      $block_actions = pm_restrict_settings_filter($form_state['values']['block_actions']);
       foreach ($block_actions as $key => $row) {
         $weight[$key]  = $row['weight'];
       }
@@ -260,11 +253,11 @@ function pm_restrict_settings_submit($form, &$form_state) {
 
 /**
  * Return autocomplete results for usernames.
- *  Modified so all completions are available to anyone with privatemsg admin privileges.
  *
- * Prevents usernames from being used and/or suggested twice.
+ * Modified so all completions are available to anyone with privatemsg admin
+ * privileges. Prevents usernames from being used and/or suggested twice.
  *
- * @see  privatemsg_autocomplete().
+ * @see privatemsg_autocomplete()
  */
 function pm_restrict_autocomplete($string) {
   $names = array();
@@ -296,14 +289,12 @@ function pm_restrict_autocomplete($string) {
     }
   }
 
-  // remove user 1, this user will always have all privileges.
+  // Remove user 1, this user will always have all privileges.
   foreach ($matches as $key => $match) {
     if ($match->type == 'user' && $match->uid == 1) {
       unset($matches[$key]);
     }
   }
-  // we want to see all options for admin area.
-  // drupal_alter('privatemsg_autocomplete', $matches, $names, $fragment);
 
   // Format the suggestions.
   $themed_matches = array();
@@ -326,14 +317,13 @@ function pm_restrict_autocomplete($string) {
     }
   }
 
-  // Prefix the matches and convert them to the correct form for the
-  // autocomplete.
+  // Prefix the matches and convert them to the correct form for autocomplete.
   $prefix = count($names) ? implode(", ", $names) . ", " : '';
   $suggestions = array();
   foreach ($themed_matches as $match) {
     $suggestions[$prefix . $match . ', '] = $match;
   }
 
-  // convert to object to prevent drupal bug, see http://drupal.org/node/175361
-  drupal_json_output((object)$suggestions);
+  // Convert to object to prevent drupal bug, see http://drupal.org/node/175361
+  drupal_json_output((object) $suggestions);
 }
